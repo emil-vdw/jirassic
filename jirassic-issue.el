@@ -22,6 +22,28 @@
 
 
 ;;; Code:
+(cl-defstruct jirassic-user
+  "A Jira user."
+  (account-id nil
+              :read-only t
+              :type string
+              :documentation "The user ID, e.g. \"5b10ac8d4c0016482c7f3d0a\".")
+
+  (link nil
+        :read-only t
+        :type string
+        :documentation "Link to retrieve user account information.")
+
+  (email-address nil
+                 :read-only t
+                 :type string
+                 :documentation "User email address.")
+
+  (display-name nil
+                :read-only t
+                :type string
+                :documentation "User display name."))
+
 (cl-defstruct jirassic-issue
   "A Jira issue."
   (id nil
@@ -37,6 +59,20 @@
   (type nil
         :read-only t
         :type string)
+
+  (status nil
+          :read-only t
+          :type string
+          :documentation "The issue status, e.g. \"In Progress\".")
+
+  (creator nil
+           :read-only t
+           :type jirassic-user
+           :documentation "The issue creator.")
+
+  (project nil
+           :read-only t
+           :type string)
 
   (summary nil
            :read-only t
