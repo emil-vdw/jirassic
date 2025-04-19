@@ -30,6 +30,32 @@
   ;; convert the JIRA status to an appropriate org string.
   "TODO")
 
+(defun jirassic--serialize-text (data)
+  "Serialize ADF objects to org strings."
+  (let ((text (alist-get 'text data))
+        (marks
+         ;; Convert the vector of marks to a list
+         (seq-into (alist-get 'marks data) 'list)))
+    (insert
+     (-reduce-from (lambda (formatted-text mark)
+                     (let ((type (alist-get 'type mark))
+                           (attrs (alist-get 'attrs mark)))
+                       (cond
+                        ((string= type "strong")
+                         (format "*%s*" formatted-text))
+                        ((string= type "em")
+                         (format "/%s/" formatted-text))
+                        ((string= type "underline")
+                         (format "_%s_" formatted-text))
+                        ((string= type "strike")
+                         (format "+%s+" formatted-text))
+                        ((string= type "code")
+                         (format "~%s~" formatted-text))
+                        ((string= type "link")
+                         (format "[[%s][%s]]" (alist-get 'href attrs) text)))))
+
+                   text marks))))
+
 (defun jirassic--serialize-doc (doc)
   "Serialize ADF objects to org strings.")
 
