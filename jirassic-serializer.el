@@ -28,18 +28,34 @@
   "The character to use for list items."
   :type 'string)
 
+(defcustom jirassic-org-todo-state-alist
+  '(("To Do" . "TODO")
+    ("In Progress" . "IN PROGRESS")
+    ("Done" . "DONE"))
+  "Map Jira status to org todo states.")
+
+(defvar jirassic--list-depth -1
+  "The current depth of the list. Used to indent list items.")
+(defvar jirassic--entry-level 0
+  "The current level of the entry. Used to set the heading level.")
+
 (defun jirassic--serialize-status (jira-status)
   "Serialize a JIRA status to an org string."
-  ;; XXX: This is a placeholder. The actual implementation should
-  ;; convert the JIRA status to an appropriate org string.
-  "TODO")
+  (alist-get "To Do" jirassic-org-todo-state-alist
+             nil nil #'string-equal))
 
 (defun jirassic--serialize-text (data)
-  "Serialize ADF objects to org strings."
-  (let ((text (alist-get 'text data))
-        (marks
-         ;; Convert the vector of marks to a list
-         (seq-into (alist-get 'marks data) 'list)))
+  "Serialize ADF text objects to org strings."
+  (let* ((text
+          ;; There is an edge case here where the text is a checkbox.
+          ;; Jira uses a lowercase x for filled checkboxes, but we need to
+          ;; convert it to an uppercase X for org mode.
+          (s-replace-regexp "^\\[x\\]"
+                            "[X]"
+                            (alist-get 'text data)))
+         (marks
+          ;; Convert the vector of marks to a list
+          (seq-into (alist-get 'marks data) 'list)))
     (insert
      (-reduce-from (lambda (formatted-text mark)
                      (let ((type (alist-get 'type mark))
@@ -67,37 +83,76 @@
   (newline))
 
 (defun jirassic--serialize-bullet-list (data)
-  (newline)
-  (setq jirassic-list-depth (+ jirassic-list-depth 1))
+  (setq jirassic--list-depth (1+ jirassic--list-depth))
+  (when (> jirassic--list-depth 1)
+    ;; Insert a newline before serializing nested lists
+    (newline))
   (let ((list-items
          ;; Convert the vector of list items to a list
          (seq-into (alist-get 'content data) 'list)))
 
-    (-map (lambda (list-item)
-            (insert
-             (s-repeat (* jirassic-list-depth 2) " ")
-             (format "%s " jirassic-list-item-bullet))
-            (jirassic--serialize-doc-node list-item))
-          list-items))
-  (setq jirassic-list-depth (- jirassic-list-depth 1)))
+    (-map-indexed (lambda (index list-item)
+                    (insert
+                     (s-repeat (* (1- jirassic--list-depth)
+                                  (+ 2 org-list-indent-offset))
+                               " ")
+                     (format "%s " jirassic-list-item-bullet))
+                    (jirassic--serialize-doc-node list-item)
+                    (when (< index (1- (length list-items)))
+                      (newline)))
+                  list-items))
+  (setq jirassic--list-depth (1- jirassic--list-depth)))
+
+(defun jirassic--serialize-ordered-list (data)
+  "Serialize jira ADF ordered lists to org ordered lists.
+"
+  (setq jirassic--list-depth (1+ jirassic--list-depth))
+  (when (> jirassic--list-depth 1)
+    ;; Insert a newline before serializing nested lists
+    (newline))
+  (let ((list-items
+         ;; Convert the vector of list items to a list
+         (seq-into (alist-get 'content data) 'list)))
+
+    (-map-indexed (lambda (index list-item)
+                    (insert
+                     (s-repeat (* (1- jirassic--list-depth)
+                                  (+ 2 org-list-indent-offset))
+                               " ")
+                     (format "%s. " (1+ index)))
+                    (jirassic--serialize-doc-node list-item)
+                    (when (< index (1- (length list-items)))
+                      ;; Insert a newline after each list item except
+                      ;; the last
+                      (newline)))
+                  list-items))
+
+  (setq jirassic--list-depth (1- jirassic--list-depth)))
 
 (defun jirassic--serialize-doc-node-content (data)
   (let ((content (seq-into (alist-get 'content data) 'list)))
-   (-map (lambda (node)
-           (jirassic--serialize-doc-node node))
-         content)))
+    (-map-indexed (lambda (index node)
+                    (jirassic--serialize-doc-node node))
+                  content)))
 
 (defun jirassic--serialize-paragraph (data)
   (jirassic--serialize-doc-node-content data))
 
 (defun jirassic--serialize-list-item (data)
-  (jirassic--serialize-doc-node-content data)
-  (newline))
+  (jirassic--serialize-doc-node-content data))
 
-(defun jirassic--serialize-doc (doc)
-  (org-dlet ((jirassic-list-depth 0) ; Keep track of the current list depth
-             )
-    (jirassic--serialize-doc-node doc)))
+(defun jirassic--serialize-heading (data)
+  (let* ((attrs (alist-get 'attrs data))
+         (level (+ jirassic--entry-level (alist-get 'level attrs)))
+         (content (seq-into (alist-get 'content data) 'list)))
+    (org-insert-heading nil nil level)
+    (mapc #'jirassic--serialize-doc-node content)
+    (newline)))
+
+(defun jirassic--serialize-doc (doc &optional level)
+  (setq jirassic--list-depth 0)
+  (setq jirassic--entry-level (or level 0))
+  (jirassic--serialize-doc-node doc))
 
 (defun jirassic--serialize-doc-node (node)
   "Serialize ADF objects to org strings."
@@ -109,6 +164,8 @@
       (jirassic--serialize-rule node))
      ((string= type "bulletList")
       (jirassic--serialize-bullet-list node))
+     ((string= type "orderedList")
+      (jirassic--serialize-ordered-list node))
      ((string= type "listItem")
       (jirassic--serialize-list-item node))
      ((string= type "hardBreak")
@@ -117,9 +174,10 @@
       (jirassic--serialize-doc-node-content node))
      ((string= type "doc")
       (jirassic--serialize-doc-node-content node))
-     ;; (t
-     ;;  (error "Unknown type: %s" type))
-     )))
+     ((string= type "heading")
+      (jirassic--serialize-heading node))
+     (t
+      (message "Unknown type: %s" type)))))
 
 (defun jirassic--serialize-properties (issue)
   "Set org entry properties for the given ISSUE."
@@ -143,8 +201,7 @@
     (newline)
     (jirassic--serialize-properties issue)
     (newline)
-    (jirassic--serialize-doc (jirassic-issue-description issue))
-    ))
+    (jirassic--serialize-doc (jirassic-issue-description issue))))
 
 
 (provide 'jirassic-serializer)
