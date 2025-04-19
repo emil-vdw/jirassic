@@ -43,7 +43,16 @@
                  (concat
                   username ":" token) t))))))
 
-(cl-defun jirassic--get (segments &key params then)
+(defun jirassic--default-error-handler (err)
+  ""
+  (setq emem-test-error err)
+  (error (concat "Error while calling Jira API.\n"
+                 "Message: %s\n"
+                 "Error: %s")
+         (plz-error-message err)
+         (plz-error-curl-error err)))
+
+(cl-defun jirassic--get (segments &key params then else finally)
   "Make a GET request to the Jira API with SEGMENTS and optional PARAMS.
 SEGMENTS is a list of URL segments to append to the base URL. PARAMS is
 an alist of query parameters to include in the request."
@@ -61,9 +70,9 @@ an alist of query parameters to include in the request."
       :headers headers
       :as #'json-read
       :then then
-      ;; XXX: Handle errors
-      :else (lambda (&rest e)
-              (message "error!\n%s" e)))))
+      :else (or else
+                #'jirassic--default-error-handler)
+      :finally finally)))
 
 
 (provide 'jirassic-client)

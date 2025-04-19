@@ -58,7 +58,13 @@
 
   (type nil
         :read-only t
-        :type string)
+        :type string
+        :documentation "The issue type, e.g. \"Task\".")
+
+  (priority nil
+            :read-only t
+            :type string
+            :documentation "The issue priority, e.g. \"Major\".")
 
   (status nil
           :read-only t
