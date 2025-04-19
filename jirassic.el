@@ -33,36 +33,6 @@
         (jirassic--serialize-issue issue level)))))
 
 
-(defun jirassic--org-get-issue-error-handler (err)
-  "Handle errors when retrieving a Jira issue."
-  (cond
-   ((plz-error-response err)
-    (let* ((response (plz-error-response err))
-           (status (plz-response-status response))
-           (headers (plz-response-headers response))
-           (content-type (alist-get 'content-type headers))
-           (body (plz-response-body response))
-           (error-message
-            (if (s-starts-with-p "application/json" content-type)
-                (s-join "\n"
-                        (alist-get 'errorMessages
-                                   (json-parse-string body :object-type 'alist)))
-              (format "%s" body))))
-      (cond
-       ((and (>= status 400)
-             (< status 500))
-        (error error-message))
-
-       (t 
-        (error error-message)))))
-
-   ((plz-error-message err)
-    (error "Failed to retrieve issue: %s" (plz-error-message err)))
-
-   (t
-    (error "Unknown error: %s" err))))
-
-
 ;;;###autoload
 (defun jirassic-org-insert-issue (key &optional level)
   "Insert a Jira issue into the current buffer."
@@ -74,15 +44,13 @@
         ;; later when inserting the issue.
         (pos (point))
         (buf (current-buffer)))
-    (jirassic--get (concat "issue/" key)
-                   :then
-                   (lambda (response)
-                     (jirassic--org-insert-issue-at
-                      buf pos
-                      (jirassic--parse-issue response)
-                      level))
-                   :else
-                   #'jirassic--org-get-issue-error-handler)))
+    (jirassic-get-issue key
+                        :then
+                        (lambda (data)
+                          (jirassic--org-insert-issue-at
+                           buf pos
+                           (jirassic--parse-issue data)
+                           level)))))
 
 
 (provide 'jirassic)
