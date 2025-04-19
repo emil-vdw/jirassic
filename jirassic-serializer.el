@@ -24,6 +24,10 @@
 
 ;;; Code:
 
+(defcustom jirassic-list-item-bullet "+"
+  "The character to use for list items."
+  :type 'string)
+
 (defun jirassic--serialize-status (jira-status)
   "Serialize a JIRA status to an org string."
   ;; XXX: This is a placeholder. The actual implementation should
@@ -56,8 +60,66 @@
 
                    text marks))))
 
+(defun jirassic--serialize-rule (data)
+  "Serialize ADF objects to org strings."
+  (newline)
+  (insert "-----")
+  (newline))
+
+(defun jirassic--serialize-bullet-list (data)
+  (newline)
+  (setq jirassic-list-depth (+ jirassic-list-depth 1))
+  (let ((list-items
+         ;; Convert the vector of list items to a list
+         (seq-into (alist-get 'content data) 'list)))
+
+    (-map (lambda (list-item)
+            (insert
+             (s-repeat (* jirassic-list-depth 2) " ")
+             (format "%s " jirassic-list-item-bullet))
+            (jirassic--serialize-doc-node list-item))
+          list-items))
+  (setq jirassic-list-depth (- jirassic-list-depth 1)))
+
+(defun jirassic--serialize-doc-node-content (data)
+  (let ((content (seq-into (alist-get 'content data) 'list)))
+   (-map (lambda (node)
+           (jirassic--serialize-doc-node node))
+         content)))
+
+(defun jirassic--serialize-paragraph (data)
+  (jirassic--serialize-doc-node-content data))
+
+(defun jirassic--serialize-list-item (data)
+  (jirassic--serialize-doc-node-content data)
+  (newline))
+
 (defun jirassic--serialize-doc (doc)
-  "Serialize ADF objects to org strings.")
+  (org-dlet ((jirassic-list-depth 0) ; Keep track of the current list depth
+             )
+    (jirassic--serialize-doc-node doc)))
+
+(defun jirassic--serialize-doc-node (node)
+  "Serialize ADF objects to org strings."
+  (let ((type (alist-get 'type node)))
+    (cond
+     ((string= type "text")
+      (jirassic--serialize-text node))
+     ((string= type "rule")
+      (jirassic--serialize-rule node))
+     ((string= type "bulletList")
+      (jirassic--serialize-bullet-list node))
+     ((string= type "listItem")
+      (jirassic--serialize-list-item node))
+     ((string= type "hardBreak")
+      (newline))
+     ((string= type "paragraph")
+      (jirassic--serialize-doc-node-content node))
+     ((string= type "doc")
+      (jirassic--serialize-doc-node-content node))
+     ;; (t
+     ;;  (error "Unknown type: %s" type))
+     )))
 
 (defun jirassic--serialize-properties (issue)
   "Set org entry properties for the given ISSUE."
@@ -81,7 +143,7 @@
     (newline)
     (jirassic--serialize-properties issue)
     (newline)
-    ;; (jirassic--serialize-doc (jirassic-issue-description issue))
+    (jirassic--serialize-doc (jirassic-issue-description issue))
     ))
 
 
