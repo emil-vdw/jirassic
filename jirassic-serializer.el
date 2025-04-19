@@ -53,28 +53,26 @@
           (s-replace-regexp "^\\[x\\]"
                             "[X]"
                             (alist-get 'text data)))
-         (marks
-          ;; Convert the vector of marks to a list
-          (seq-into (alist-get 'marks data) 'list)))
+         (marks (alist-get 'marks data)))
     (insert
-     (-reduce-from (lambda (formatted-text mark)
-                     (let ((type (alist-get 'type mark))
-                           (attrs (alist-get 'attrs mark)))
-                       (cond
-                        ((string= type "strong")
-                         (format "*%s*" formatted-text))
-                        ((string= type "em")
-                         (format "/%s/" formatted-text))
-                        ((string= type "underline")
-                         (format "_%s_" formatted-text))
-                        ((string= type "strike")
-                         (format "+%s+" formatted-text))
-                        ((string= type "code")
-                         (format "~%s~" formatted-text))
-                        ((string= type "link")
-                         (format "[[%s][%s]]" (alist-get 'href attrs) text)))))
+     (seq-reduce (lambda (formatted-text mark)
+                   (let ((type (alist-get 'type mark))
+                         (attrs (alist-get 'attrs mark)))
+                     (cond
+                      ((string= type "strong")
+                       (format "*%s*" formatted-text))
+                      ((string= type "em")
+                       (format "/%s/" formatted-text))
+                      ((string= type "underline")
+                       (format "_%s_" formatted-text))
+                      ((string= type "strike")
+                       (format "+%s+" formatted-text))
+                      ((string= type "code")
+                       (format "~%s~" formatted-text))
+                      ((string= type "link")
+                       (format "[[%s][%s]]" (alist-get 'href attrs) text)))))
 
-                   text marks))))
+                 marks text))))
 
 (defun jirassic--serialize-rule (data)
   "Serialize ADF objects to org strings."
@@ -82,25 +80,43 @@
   (insert "-----")
   (newline))
 
+(defun jirassic--serialize-blockquote (data)
+  (insert "#+BEGIN_QUOTE")
+  (newline)
+  (jirassic--serialize-doc-node-content data)
+  (newline)
+  (insert "#+END_QUOTE")
+  (newline))
+
+(defun jirassic--serialize-codeblock (data)
+  (let* ((attrs (alist-get 'attrs data))
+         (language (alist-get 'language attrs))
+         (content (alist-get 'content data)))
+    (insert "#+BEGIN_SRC"
+            (when language
+              (concat " " language)))
+    (newline)
+    (jirassic--serialize-doc-node-content data)
+    (newline)
+    (insert "#+END_SRC")
+    (newline)))
+
 (defun jirassic--serialize-bullet-list (data)
   (setq jirassic--list-depth (1+ jirassic--list-depth))
   (when (> jirassic--list-depth 1)
     ;; Insert a newline before serializing nested lists
     (newline))
-  (let ((list-items
-         ;; Convert the vector of list items to a list
-         (seq-into (alist-get 'content data) 'list)))
-
-    (-map-indexed (lambda (index list-item)
-                    (insert
-                     (s-repeat (* (1- jirassic--list-depth)
-                                  (+ 2 org-list-indent-offset))
-                               " ")
-                     (format "%s " jirassic-list-item-bullet))
-                    (jirassic--serialize-doc-node list-item)
-                    (when (< index (1- (length list-items)))
-                      (newline)))
-                  list-items))
+  (let ((list-items (alist-get 'content data)))
+    (seq-map-indexed (lambda (list-item index)
+                       (insert
+                        (s-repeat (* (1- jirassic--list-depth)
+                                     (+ 2 org-list-indent-offset))
+                                  " ")
+                        (format "%s " jirassic-list-item-bullet))
+                       (jirassic--serialize-doc-node list-item)
+                       (when (< index (1- (length list-items)))
+                         (newline)))
+                     list-items))
   (setq jirassic--list-depth (1- jirassic--list-depth)))
 
 (defun jirassic--serialize-ordered-list (data)
@@ -110,11 +126,9 @@
   (when (> jirassic--list-depth 1)
     ;; Insert a newline before serializing nested lists
     (newline))
-  (let ((list-items
-         ;; Convert the vector of list items to a list
-         (seq-into (alist-get 'content data) 'list)))
+  (let ((list-items (alist-get 'content data)))
 
-    (-map-indexed (lambda (index list-item)
+    (seq-map-indexed (lambda (list-item index)
                     (insert
                      (s-repeat (* (1- jirassic--list-depth)
                                   (+ 2 org-list-indent-offset))
@@ -130,10 +144,10 @@
   (setq jirassic--list-depth (1- jirassic--list-depth)))
 
 (defun jirassic--serialize-doc-node-content (data)
-  (let ((content (seq-into (alist-get 'content data) 'list)))
-    (-map-indexed (lambda (index node)
-                    (jirassic--serialize-doc-node node))
-                  content)))
+  (let ((content (alist-get 'content data)))
+    (seq-map-indexed (lambda (node index)
+                       (jirassic--serialize-doc-node node))
+                     content)))
 
 (defun jirassic--serialize-paragraph (data)
   (jirassic--serialize-doc-node-content data))
@@ -176,6 +190,10 @@
       (jirassic--serialize-doc-node-content node))
      ((string= type "heading")
       (jirassic--serialize-heading node))
+     ((string= type "blockquote")
+      (jirassic--serialize-blockquote node))
+     ((string= type "codeBlock")
+      (jirassic--serialize-codeblock node))
      (t
       (message "Unknown type: %s" type)))))
 
