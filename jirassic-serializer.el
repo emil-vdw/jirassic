@@ -214,6 +214,34 @@ information.")
                                 ;; Convert milliseconds to seconds
                                 (seconds-to-time (/ timestamp 1000))))))
 
+(defun jirassic--serialize-attachments (attachments)
+  "Serialize Jira ATTACHMENTS to org attachments."
+  (seq-map (lambda (a)
+             (let* ((attach-dir (org-attach-dir 'get-create))
+                    (filename (alist-get 'filename a))
+                    (id (alist-get 'id a))
+                    (mimetype (alist-get 'mimeType a))
+                    (filetype (alist-get mimetype
+                                         '(("image/png" . "png")
+                                           ("image/jpeg" . "jpg")
+                                           ("image/gif" . "gif")
+                                           ("application/pdf" . "pdf")
+                                           ("application/zip" . "zip"))
+                                         nil nil #'string=))
+                    (attachment-filename
+                     (if (and filetype
+                              (not (string= (f-ext filename) filetype)))
+                         (f-swap-ext filename filetype)
+                       filename))
+                    (attachment-path
+                     (f-expand attachment-filename
+                               attach-dir)))
+               (jirassic-download-attachment id attachment-path
+                                             :then
+                                             (cl-function (lambda (&rest args &allow-other-keys)
+                                                            (org-attach-tag))))))
+           attachments))
+
 (defun jirassic--determine-normalized-heading-offset (data)
   "Find the normalized heading offset from the headings in DATA.
 

@@ -9,13 +9,25 @@
 (require 'jirassic-serializer)
 
 
+(defcustom jirassic-org-add-attachments t
+  "Whether to download and attach files.
+
+If nil, the media files will be linked to the issue. If t, the media
+files will be downloaded and attached to the org file via `org-attach'.")
+
+(defvar jirassic-issue nil
+  "Most recently inserted Jira issue for post-insert hooks.")
+
 (defcustom jirassic-org-after-insert-hook nil
   "Hook run after inserting a Jira issue into an Org buffer."
   :type 'hook
   :group 'jirassic)
 
-(defvar jirassic-issue nil
-  "Most recently inserted Jira issue for post-insert hooks.")
+(defun jirassic-org--maybe-download-attachments ()
+  (when (and jirassic-org-add-attachments
+             buffer-file-name)
+    (jirassic--serialize-attachments
+     (jirassic-issue-attachments jirassic-issue))))
 
 (defun jirassic--org-insert-issue-at (buf pos issue &optional level)
   "Insert a Jira issue into the current buffer."
@@ -52,6 +64,9 @@
                              jirassic-issue
                              level)
                             (run-hooks 'jirassic-org-after-insert-hook))))))
+
+(add-hook 'jirassic-org-after-insert-hook #'jirassic-org--maybe-download-attachments)
+
 
 (provide 'jirassic-org)
 ;;; jirassic-org.el ends here

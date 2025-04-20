@@ -73,6 +73,7 @@
        (project (fields project key))
        (type (fields issuetype name))
        (priority (fields priority name))
+       (attachments (fields attachment))
        id key)
     (make-jirassic-issue
      :id id
@@ -84,7 +85,8 @@
      :description description
      :link link
      :status status
-     :summary summary)))
+     :summary summary
+     :attachments attachments)))
 
 (provide 'jirassic-parser)
 ;;; jirassic-parser.el ends here

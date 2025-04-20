@@ -16,6 +16,11 @@
   :type 'string
   :group 'jirassic)
 
+(defcustom jirassic-overwrite-attachments nil
+  "Overwrite existing attachments."
+  :type 'boolean
+  :group 'jirassic)
+
 (cl-defstruct jirassic-client-response
   "A Jira client response."
   (status nil
@@ -157,6 +162,28 @@ an alist of query parameters to include in the request."
   (jirassic--get (list "issue" key)
                  :then then
                  :else else))
+
+(cl-defun jirassic-download-attachment (id to &key then else)
+  "Download a Jira attachment by ID to a local file TO."
+  (if (and (file-exists-p to)
+           (not jirassic-overwrite-attachments))
+      (message "Jira attachment %s exists, skipping" to)
+    (let* ((resource (s-join "/" (list "attachment" "content" id)))
+           (url (s-concat (s-chop-suffix "/" (jirassic--base-url)) "/" resource))
+           (credentials (jirassic--credentials))
+           (headers (jirassic--http-headers credentials)))
+
+      (request url
+        :encoding 'binary
+        :parser #'buffer-string
+        :headers headers
+        :success (cl-function (lambda (&key data &allow-other-keys)
+                                (with-temp-file to
+                                  (insert data))
+                                (funcall then to)))
+        :error
+        (jirassic--error-callback (or else
+                                      #'jirassic--default-error-handler))))))
 
 (provide 'jirassic-client)
 ;;; jirassic-client.el ends here

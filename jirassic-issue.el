@@ -93,7 +93,12 @@
   (link nil
         :read-only t
         :type string
-        :documentation "The issue link, e.g. \"https://jira.example.com/browse/LPI-5041\"."))
+        :documentation "The issue link, e.g. \"https://jira.example.com/browse/LPI-5041\".")
+
+  (attachments nil
+               :read-only t
+               :type vector
+               :documentation "Vector of attachments for the issue."))
 
 
 (provide 'jirassic-issue)
