@@ -3,8 +3,37 @@
 Jirassic is an Emacs package that provides a convenient interface for interacting with Jira's REST API. It allows you to create, update, delete, and retrieve Jira issues directly from Emacs, with optional integration into Org Mode.
 
 * Features
-+ Serialize Jira issues into Org Mode entries.
-+ Optional integration with ~org-roam~ for enhanced note-taking workflows.
+
+** Serialize Jira issues to Org
+- Import Jira issues into Org Mode buffers.
+
+- Normalize headings:
+  Jira issue descriptions often use heading levels (e.g., level 3 and greater) for visual reasons. This can look inconsistent when translated to Org format. Jirassic provides a feature to normalize heading levels by reducing all headings in the description by the difference between the largest heading level and 1.
+
+  This behavior is controlled by the customizable variable ~jirassic-normalize-heading-levels~. When enabled, it ensures that headings in the description are adjusted to start at a visually consistent level in Org mode.
+
+  #+BEGIN_SRC emacs-lisp
+  (setopt jirassic-normalize-heading-levels t)
+  #+END_SRC
+
+- Metadata Serialization:
+  Jirassic automatically adds metadata from the Jira issue as Org properties.
+  For example:
+  #+BEGIN_QUOTE
+  :issue-key: ISSUE-1234
+  :issue-type: Bug
+  :issue-creator: John Doe
+  :issue-project: ProjectName
+  #+END_QUOTE
+
+- Additional properties, tags, etc.
+  You can customize how Jira issues are serialized into Org by modifying the hooks and variables provided by Jirassic. For example, you can add custom properties or tags to the Org entry after insertion using the ~jirassic-org-after-insert-hook~.
+
+  #+BEGIN_SRC emacs-lisp
+  (add-hook 'jirassic-org-after-insert-hook
+            (lambda ()
+              (org-set-tags "jira")))
+  #+END_SRC
 
 * Installation
 
