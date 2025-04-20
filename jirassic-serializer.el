@@ -56,6 +56,15 @@ difference between the largest heading level and 1.")
 See `jirassic--determine-normalized-heading-offset' for more
 information.")
 
+(defvar jirassic--serialized-entry-start nil
+  "Start marker of the last entry serialized.")
+
+(defvar jirassic--downloading-attachments-for-entry nil
+  "The entry for which we are downloading attachments.
+
+This stores a marker to the entry when the download starts
+so that we can return to it when the download is complete.")
+
 (defun jirassic--serialize-status (jira-status)
   "Serialize a JIRA status to an org string."
   (alist-get "To Do" jirassic-org-todo-state-alist
@@ -216,6 +225,8 @@ information.")
 
 (defun jirassic--serialize-attachments (attachments)
   "Serialize Jira ATTACHMENTS to org attachments."
+  (setq jirassic--downloading-attachments-for-entry
+        (point-marker))
   (seq-map (lambda (a)
              (let* ((attach-dir (org-attach-dir 'get-create))
                     (filename (alist-get 'filename a))
@@ -236,10 +247,20 @@ information.")
                     (attachment-path
                      (f-expand attachment-filename
                                attach-dir)))
-               (jirassic-download-attachment id attachment-path
-                                             :then
-                                             (cl-function (lambda (&rest args &allow-other-keys)
-                                                            (org-attach-tag))))))
+               (jirassic-download-attachment
+                id attachment-path
+                :then
+                (cl-function
+                 (lambda (&rest args &allow-other-keys)
+                   ;; Since the user might have changed buffer while the
+                   ;; download was in progress, we need to return to the
+                   ;; org entry that we are downloading attachments for.
+                   (save-excursion
+                     (with-current-buffer (marker-buffer
+                                           jirassic--downloading-attachments-for-entry)
+                       (goto-char (marker-position
+                                   jirassic--downloading-attachments-for-entry))
+                       (org-attach-tag))))))))
            attachments))
 
 (defun jirassic--determine-normalized-heading-offset (data)
@@ -335,15 +356,18 @@ normalized heading offset of a heading with level 4 in data will be:
 
 (defun jirassic--serialize-properties (issue)
   "Set org entry properties for the given ISSUE."
+  (insert ":PROPERTIES:\n")
   (mapc (lambda (property)
-         (org-entry-put nil (car property) (cadr property)))
+          (insert (format ":%s: %s\n"
+                          (car property) (cadr property))))
         `(("issue-link" ,(jirassic-issue-link issue))
           ("issue-id" ,(jirassic-issue-id issue))
           ("issue-key" ,(jirassic-issue-key issue))
           ("issue-type" ,(jirassic-issue-type issue))
           ("issue-creator" ,(jirassic-user-display-name
                              (jirassic-issue-creator issue)))
-          ("issue-project" ,(jirassic-issue-project issue)))))
+          ("issue-project" ,(jirassic-issue-project issue))))
+  (insert ":END:\n"))
 
 (defun jirassic--serialize-issue (issue &optional level)
   "Serialize a JIRA issue to an org entry."
@@ -359,6 +383,7 @@ normalized heading offset of a heading with level 4 in data will be:
            (s-repeat level "*") " "))
       (org-insert-heading nil nil level))
 
+    (setq jirassic--serialized-entry-start (point-marker))
     (insert (jirassic--serialize-status (jirassic-issue-status issue))
             " "
             (jirassic-issue-summary issue))

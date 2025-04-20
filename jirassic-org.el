@@ -15,20 +15,26 @@
 If nil, the media files will be linked to the issue. If t, the media
 files will be downloaded and attached to the org file via `org-attach'.")
 
-(defvar jirassic-issue nil
-  "Most recently inserted Jira issue for post-insert hooks.")
+(defvar jirassic-issue-last-inserted nil
+  "Most recently inserted Jira issue for use in hooks.")
 
 (defcustom jirassic-org-after-insert-hook nil
   "Hook run after inserting a Jira issue into an Org buffer."
   :type 'hook
   :group 'jirassic)
 
-(defun jirassic-org--maybe-download-attachments ()
+(defun jirassic--is-jira-issue (&optional epom)
+  "Check if org entry at EPOM is a jira issue.
+
+EPOM is an element, marker, or buffer position."
+  (not (null (org-entry-get epom "issue-id"))))
+
 (defun jirassic--maybe-download-org-attachments ()
   (when (and jirassic-org-add-attachments
+             (jirassic--is-jira-issue)
              buffer-file-name)
     (jirassic--serialize-attachments
-     (jirassic-issue-attachments jirassic-issue))))
+     (jirassic-issue-attachments jirassic-issue-last-inserted))))
 
 (defun jirassic--org-insert-issue-at (buf pos issue &optional level)
   "Insert a Jira issue into the current buffer."
@@ -38,6 +44,13 @@ files will be downloaded and attached to the org file via `org-attach'.")
     (with-current-buffer buf
       (goto-char pos)
       (jirassic--serialize-issue issue level))))
+
+(defun jirassic--org-capture-finalize ()
+  "Perform finalization after org capture of jira issues."
+  (with-current-buffer (marker-buffer org-capture-last-stored-marker)
+    (goto-char (marker-position org-capture-last-stored-marker))
+    (when (jirassic--is-jira-issue)
+      (jirassic--maybe-download-org-attachments))))
 
 ;;;###autoload
 (defun jirassic-org-insert-issue (key &optional level)
@@ -53,21 +66,28 @@ files will be downloaded and attached to the org file via `org-attach'.")
   (let (
         ;; Store the current point and buffer so we can return to it
         ;; later when inserting the issue.
-        (pos (point))
-        (buf (current-buffer)))
+        (where-to-insert (point-marker)))
     (message "Fetching issue %s..." key)
     (jirassic-get-issue key
                         :then
                         (lambda (data)
-                          (let ((jirassic-issue (jirassic--parse-issue data)))
+                          (let ((issue (jirassic--parse-issue data)))
+                            (setq jirassic-issue-last-inserted issue)
                             (jirassic--org-insert-issue-at
-                             buf pos
-                             jirassic-issue
+                             (marker-buffer where-to-insert)
+                             (marker-position where-to-insert)
+                             issue
                              level)
-                            (run-hooks 'jirassic-org-after-insert-hook))))))
+                            ;; We need to run the hooks after inserting the issue,
+                            ;; making sure to go to the start of the entry before
+                            ;; running the hooks.
+                            (save-excursion
+                              (with-current-buffer (marker-buffer jirassic--serialized-entry-start)
+                                (goto-char (marker-position jirassic--serialized-entry-start))
+                                (run-hooks 'jirassic-org-after-insert-hook))))))))
 
 (add-hook 'jirassic-org-after-insert-hook #'jirassic--maybe-download-org-attachments)
-
+(add-hook 'org-capture-after-finalize-hook #'jirassic--org-capture-finalize)
 
 (provide 'jirassic-org)
 ;;; jirassic-org.el ends here
