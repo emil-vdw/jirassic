@@ -28,7 +28,7 @@ Jirassic uses Emacs' built-in ~auth-source~ library to securely manage your Jira
    Add an entry for your Jira instance in the auth source file. Replace ~host.atlassian.net~, ~<user-email>~, and ~<api-key>~ with your Jira host, email, and API key, respectively.
 
    #+BEGIN_SRC text
-   machine host.atlassian.net login <user-email> password <api-key>
+     machine host.atlassian.net login <user-email> password <api-key>
    #+END_SRC
 
 
@@ -36,17 +36,17 @@ Jirassic uses Emacs' built-in ~auth-source~ library to securely manage your Jira
    Ensure your auth source file has the correct permissions to prevent unauthorized access. For example:
 
    #+BEGIN_SRC shell
-   chmod 600 ~/.authinfo
+     chmod 600 ~/.authinfo
    #+END_SRC
 
 4. *Test Your Configuration*
    After setting up your credentials, test the configuration by calling a Jirassic function, such as:
 
    #+BEGIN_SRC emacs-lisp
-   (jirassic-get-issue "ISSUE-123")
+     (jirassic-get-issue "ISSUE-123")
    #+END_SRC
 
-   If everything is configured correctly, Jirassic will use the credentials from your auth source file to authenticate with Jira.
+If everything is configured correctly, Jirassic will use the credentials from your auth source file to authenticate with Jira.
 
 
 *** Using Keychain on macOS
