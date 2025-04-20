@@ -229,7 +229,7 @@
     (newline)
     (jirassic--serialize-properties issue)
     (newline)
-    (jirassic--serialize-doc (jirassic-issue-description issue))))
+    (jirassic--serialize-doc (jirassic-issue-description issue) level)))
 
 
 (provide 'jirassic-serializer)
