@@ -103,6 +103,9 @@ information.")
   (insert "-----")
   (newline))
 
+(defun jirassic--serialize-emoji (data)
+  (insert (alist-get 'text (alist-get 'attrs data))))
+
 (defun jirassic--serialize-expand (data)
   (let ((title (alist-get 'title (alist-get 'attrs data))))
     (unless (or (null title)
@@ -285,6 +288,8 @@ normalized heading offset of a heading with level 4 in data will be:
       (jirassic--serialize-date node))
      ((string= type "expand")
       (jirassic--serialize-expand node))
+     ((string= type "emoji")
+      (jirassic--serialize-emoji node))
      (t
       (message "Unknown type: %s" type)))))
 
