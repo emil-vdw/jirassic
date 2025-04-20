@@ -138,13 +138,12 @@ an alist of query parameters to include in the request."
                             segments)
                        (list segments)))
          (resource (s-join "/" segments))
-         (url (s-concat (s-chop-suffix "/" (jirassic--base-url)) "/" resource
-                        (when params
-                          (concat "?" (url-build-query-string params)))))
+         (url (s-concat (s-chop-suffix "/" (jirassic--base-url)) "/" resource))
          (credentials (jirassic--credentials))
          (headers (jirassic--http-headers credentials)))
 
     (request url
+      :params params
       :parser #'json-read
       :headers headers
       :success (when then

@@ -23,6 +23,8 @@
 ;; Parses jira structs to org format.
 
 ;;; Code:
+(require 'jirassic-core)
+
 
 (defcustom jirassic-list-item-bullet "+"
   "The character to use for list items."
@@ -105,6 +107,12 @@ information.")
 
 (defun jirassic--serialize-emoji (data)
   (insert (alist-get 'text (alist-get 'attrs data))))
+
+(defun jirassic--serialize-mention (data)
+  (insert (format "=%s=" (alist-get 'text (alist-get 'attrs data)))))
+
+(defun jirassic--serialize-inline-card (data)
+  (insert (format "[[%s]]" (alist-get 'url (alist-get 'attrs data)))))
 
 (defun jirassic--serialize-expand (data)
   (let ((title (alist-get 'title (alist-get 'attrs data))))
@@ -290,6 +298,10 @@ normalized heading offset of a heading with level 4 in data will be:
       (jirassic--serialize-expand node))
      ((string= type "emoji")
       (jirassic--serialize-emoji node))
+     ((string= type "mention")
+      (jirassic--serialize-mention node))
+     ((string= type "inlineCard")
+      (jirassic--serialize-inline-card node))
      (t
       (message "Unknown type: %s" type)))))
 
