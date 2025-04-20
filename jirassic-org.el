@@ -24,6 +24,7 @@ files will be downloaded and attached to the org file via `org-attach'.")
   :group 'jirassic)
 
 (defun jirassic-org--maybe-download-attachments ()
+(defun jirassic--maybe-download-org-attachments ()
   (when (and jirassic-org-add-attachments
              buffer-file-name)
     (jirassic--serialize-attachments
@@ -65,7 +66,7 @@ files will be downloaded and attached to the org file via `org-attach'.")
                              level)
                             (run-hooks 'jirassic-org-after-insert-hook))))))
 
-(add-hook 'jirassic-org-after-insert-hook #'jirassic-org--maybe-download-attachments)
+(add-hook 'jirassic-org-after-insert-hook #'jirassic--maybe-download-org-attachments)
 
 
 (provide 'jirassic-org)
