@@ -14,11 +14,9 @@
   (unless (buffer-live-p buf)
     (error "Buffer no longer live"))
   (save-excursion
-    (save-restriction
-      (with-current-buffer buf
-        (widen)
-        (goto-char pos)
-        (jirassic--serialize-issue issue level)))))
+    (with-current-buffer buf
+      (goto-char pos)
+      (jirassic--serialize-issue issue level))))
 
 ;;;###autoload
 (defun jirassic-org-insert-issue (key &optional level)
@@ -26,6 +24,9 @@
   (interactive
    (list (read-string "Enter issue key: ")
          (org-current-level)))
+
+  (unless (derived-mode-p 'org-mode)
+    (error "Cannot insert issue in non-org buffer"))
   (let (
         ;; Store the current point and buffer so we can return to it
         ;; later when inserting the issue.

@@ -212,7 +212,17 @@
 (defun jirassic--serialize-issue (issue &optional level)
   "Serialize a JIRA issue to an org entry."
   (let ((level (or level 1)))
-    (org-insert-heading nil nil level)
+    (if (and (<= (count-lines (point-min) (point-max)) 1)
+             (save-excursion
+               (goto-char (line-beginning-position))
+               (looking-at-p "^\\s-*$")))
+        (progn
+          (goto-char (line-beginning-position))
+          (delete-line)
+          (insert
+           (s-repeat level "*") " "))
+      (org-insert-heading nil nil level))
+
     (insert (jirassic--serialize-status (jirassic-issue-status issue))
             " "
             (jirassic-issue-summary issue))
