@@ -57,10 +57,11 @@
 
 (defun jirassic--credentials ()
   "Return the credentials for the Jira host."
-  (car (auth-source-search
-        :host (url-host (url-generic-parse-url jirassic-host))
-        :require '(:user :secret)
-        :max 1)))
+  (or (car (auth-source-search
+            :host (url-host (url-generic-parse-url jirassic-host))
+            :require '(:user :secret)
+            :max 1))
+      (error "No credentials found for host: %s" jirassic-host)))
 
 (defun jirassic--http-headers (credentials)
   "Return the HTTP headers for the Jira API request."
