@@ -34,10 +34,25 @@
     ("Done" . "DONE"))
   "Map Jira status to org todo states.")
 
+(defcustom jirassic-normalize-heading-levels t
+  "If non-nil, normalize heading levels from Jira.
+
+In Jira issue descriptions, one often uses heading 3 and greater instead
+of using 1 and 2 for visual reasons. This does not look great when
+translated to org format.
+
+This reduces all heading levels by the
+difference between the largest heading level and 1.")
+
 (defvar jirassic--list-depth -1
   "The current depth of the list. Used to indent list items.")
 (defvar jirassic--entry-level 0
   "The current level of the entry. Used to set the heading level.")
+(defvar jirassic--normalized-heading-offset 0
+  "The offset to use for normalizing heading levels.
+
+See `jirassic--determine-normalized-heading-offset' for more
+information.")
 
 (defun jirassic--serialize-status (jira-status)
   "Serialize a JIRA status to an org string."
@@ -73,6 +88,16 @@
                        (format "[[%s][%s]]" (alist-get 'href attrs) text)))))
 
                  marks text))))
+
+(defun jirassic--serialize-heading (data)
+  (let* ((attrs (alist-get 'attrs data))
+         (level (- (+ jirassic--entry-level
+                      (alist-get 'level attrs))
+                   jirassic--normalized-heading-offset))
+         (content (seq-into (alist-get 'content data) 'list)))
+    (org-insert-heading nil nil level)
+    (mapc #'jirassic--serialize-doc-node content)
+    (newline)))
 
 (defun jirassic--serialize-rule (data)
   "Serialize ADF objects to org strings."
@@ -155,17 +180,56 @@
 (defun jirassic--serialize-list-item (data)
   (jirassic--serialize-doc-node-content data))
 
-(defun jirassic--serialize-heading (data)
-  (let* ((attrs (alist-get 'attrs data))
-         (level (+ jirassic--entry-level (alist-get 'level attrs)))
-         (content (seq-into (alist-get 'content data) 'list)))
-    (org-insert-heading nil nil level)
-    (mapc #'jirassic--serialize-doc-node content)
-    (newline)))
+(defun jirassic--determine-normalized-heading-offset (data)
+  "Find the normalized heading offset from the headings in DATA.
+
+Basically we need to determine how much to demote the headings that will
+be created from DATA so that the heading levels under the main heading
+start at the level one below the main heading.
+
+Keep in mind that the headings, when serialized, will be demoted by the
+entry's starting level, so the offset we are calculating will be relative
+to the entry's level.
+
+For example, if your DATA contains headings at levels 4 and 6, then the
+minimum is 4 and we want new headings to start at level 2, so we demote
+everything by 2. Now if we're inserting at a starting level of 3, then
+normalized heading offset of a heading with level 4 in data will be:
+'4 + 3 - 2 = 5' where 2 is the offset we are calculating.
+"
+  (let ((min-level nil))
+    (cl-labels
+        ((walk (n)
+           (cond
+            ;; If this is an alist with (type . \"heading\"), extract its level:
+            ((and (listp n)
+                  (string-equal (assoc-default 'type n) "heading"))
+             (let* ((attrs (assoc-default 'attrs n))
+                    (lvl   (assoc-default 'level attrs)))
+               (when (numberp lvl)
+                 (setq min-level
+                       (if min-level
+                           (min min-level lvl)
+                         lvl))))
+             ;; continue into its content subtree, if any:
+             (seq-map #'walk (assoc-default 'content n)))
+            ;; Otherwise, if it has content:
+            ((if-let ((content (assoc-default 'content n)))
+                 (seq-map #'walk content))))))
+      (walk data))
+
+    (max (- min-level 1)
+         0)))
 
 (defun jirassic--serialize-doc (doc &optional level)
   (setq jirassic--list-depth 0)
   (setq jirassic--entry-level (or level 0))
+  ;; Normalize heading levels if needed, see
+  ;; `jirassic-normalize-heading-levels' for more info.
+  (setq jirassic--normalized-heading-offset
+        (or (and jirassic-normalize-heading-levels
+                 (jirassic--determine-normalized-heading-offset doc))
+            0))
   (jirassic--serialize-doc-node doc))
 
 (defun jirassic--serialize-doc-node (node)
