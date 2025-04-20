@@ -100,10 +100,19 @@ information.")
     (newline)))
 
 (defun jirassic--serialize-rule (data)
-  "Serialize ADF objects to org strings."
-  (newline)
   (insert "-----")
   (newline))
+
+(defun jirassic--serialize-expand (data)
+  (let ((title (alist-get 'title (alist-get 'attrs data))))
+    (unless (or (null title)
+                (string-empty-p title))
+      (insert (format "*%s*\n" title)))
+    (insert ":EXPAND:\n")
+    (jirassic--serialize-doc-node-content data)
+    ;; Include an extra newline after the content
+    ;; to improve readability.
+    (insert ":END:\n\n")))
 
 (defun jirassic--serialize-blockquote (data)
   (insert "#+BEGIN_QUOTE")
@@ -142,7 +151,9 @@ information.")
                        (when (< index (1- (length list-items)))
                          (newline)))
                      list-items))
-  (setq jirassic--list-depth (1- jirassic--list-depth)))
+  (setq jirassic--list-depth (1- jirassic--list-depth))
+  (when (= jirassic--list-depth 0)
+    (newline)))
 
 (defun jirassic--serialize-ordered-list (data)
   "Serialize jira ADF ordered lists to org ordered lists.
@@ -166,7 +177,9 @@ information.")
                       (newline)))
                   list-items))
 
-  (setq jirassic--list-depth (1- jirassic--list-depth)))
+  (setq jirassic--list-depth (1- jirassic--list-depth))
+  (when (= jirassic--list-depth 0)
+    (newline)))
 
 (defun jirassic--serialize-doc-node-content (data)
   (let ((content (alist-get 'content data)))
@@ -175,10 +188,20 @@ information.")
                      content)))
 
 (defun jirassic--serialize-paragraph (data)
-  (jirassic--serialize-doc-node-content data))
+  (jirassic--serialize-doc-node-content data)
+  (when (= jirassic--list-depth 0)
+    (newline)))
 
 (defun jirassic--serialize-list-item (data)
   (jirassic--serialize-doc-node-content data))
+
+(defun jirassic--serialize-date (data)
+  (let ((timestamp
+         (string-to-number
+          (alist-get 'timestamp (alist-get 'attrs data)))))
+    (insert (format-time-string "<%Y-%m-%d %a>"
+                                ;; Convert milliseconds to seconds
+                                (seconds-to-time (/ timestamp 1000))))))
 
 (defun jirassic--determine-normalized-heading-offset (data)
   "Find the normalized heading offset from the headings in DATA.
@@ -249,7 +272,7 @@ normalized heading offset of a heading with level 4 in data will be:
      ((string= type "hardBreak")
       (newline))
      ((string= type "paragraph")
-      (jirassic--serialize-doc-node-content node))
+      (jirassic--serialize-paragraph node))
      ((string= type "doc")
       (jirassic--serialize-doc-node-content node))
      ((string= type "heading")
@@ -258,6 +281,10 @@ normalized heading offset of a heading with level 4 in data will be:
       (jirassic--serialize-blockquote node))
      ((string= type "codeBlock")
       (jirassic--serialize-codeblock node))
+     ((string= type "date")
+      (jirassic--serialize-date node))
+     ((string= type "expand")
+      (jirassic--serialize-expand node))
      (t
       (message "Unknown type: %s" type)))))
 
