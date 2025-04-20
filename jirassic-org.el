@@ -9,6 +9,14 @@
 (require 'jirassic-serializer)
 
 
+(defcustom jirassic-org-after-insert-hook nil
+  "Hook run after inserting a Jira issue into an Org buffer."
+  :type 'hook
+  :group 'jirassic)
+
+(defvar jirassic-issue nil
+  "Most recently inserted Jira issue for post-insert hooks.")
+
 (defun jirassic--org-insert-issue-at (buf pos issue &optional level)
   "Insert a Jira issue into the current buffer."
   (unless (buffer-live-p buf)
@@ -23,7 +31,9 @@
   "Insert a Jira issue into the current buffer."
   (interactive
    (list (read-string "Enter issue key: ")
-         (org-current-level)))
+         (if current-prefix-arg
+             (prefix-numeric-value current-prefix-arg)
+           (org-current-level))))
 
   (unless (derived-mode-p 'org-mode)
     (error "Cannot insert issue in non-org buffer"))
@@ -36,10 +46,12 @@
     (jirassic-get-issue key
                         :then
                         (lambda (data)
-                          (jirassic--org-insert-issue-at
-                           buf pos
-                           (jirassic--parse-issue data)
-                           level)))))
+                          (let ((jirassic-issue (jirassic--parse-issue data)))
+                            (jirassic--org-insert-issue-at
+                             buf pos
+                             jirassic-issue
+                             level)
+                            (run-hooks 'jirassic-org-after-insert-hook))))))
 
 (provide 'jirassic-org)
 ;;; jirassic-org.el ends here

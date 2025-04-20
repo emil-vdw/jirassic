@@ -47,7 +47,7 @@ Jirassic uses Emacs' built-in ~auth-source~ library to securely manage your Jira
    #+END_SRC
 
    If everything is configured correctly, Jirassic will use the credentials from your auth source file to authenticate with Jira.
-   
+
 
 *** Using Keychain on macOS
 ~auth-source~ can directly query the macOS Keychain for credentials. To add Jira credentials to the Keychain:
@@ -58,6 +58,55 @@ Jirassic uses Emacs' built-in ~auth-source~ library to securely manage your Jira
   - *Password*: Your Jira API key.
 
 * Usage
+** Inserting issues
+You can use the function ~jirassic-org-insert-issue~ to insert a Jira issue into an Org buffer at the current point. This function fetches the issue details from Jira and inserts them as a structured Org entry. It stores the point and buffer where it was called from and makes the API call asynchronously, allowing you to continue working in Emacs while the issue is being fetched (normally the response is instant though).
+
+When called interactively, it prompts you for the issue key. You can also set a prefix arg to specify the level the entry must be at (defaults to the current level if not specified, i.e. ~org-current-level~), for example:
+
+~C-u 4 M-x jirassic-org-insert-issue~
+
+will insert the issue at level 4.
+
+*** Basic Usage
+To insert an issue, call ~jirassic-org-insert-issue~ interactively or programmatically.
+
+#+BEGIN_SRC emacs-lisp
+  (jirassic-org-insert-issue "ABC-1234")
+#+END_SRC
+
+This will fetch the issue with the key ~ABC-1234~ and insert it at the current point in the Org buffer.
+
+*** Binding to a Key
+  You can bind ~jirassic-org-insert-issue~ to a key for quick access:
+
+  #+BEGIN_SRC emacs-lisp
+  (define-key org-mode-map (kbd "C-c j") #'jirassic-org-insert-issue)
+  #+END_SRC
+
+*** Customizing the Insertion Level
+  The function accepts an optional ~level~ argument to specify the heading level for the inserted issue. If not provided, it defaults to the current Org level.
+
+  #+BEGIN_SRC emacs-lisp
+  (jirassic-org-insert-issue "ABC-1234" 2)
+  #+END_SRC
+
+** Org capture templates
+You can easily use jirassic in org capture templates to capture org tasks from Jira tickets.
+
+Here is an example of a capture template that inserts the contents of a Jira task into the capture buffer as the contents of the capture:
+
+#+begin_src emacs-lisp
+  (setq org-capture-templates
+        '(("j" "Jira task" plain
+           (file+headline "~/org/test.org" "Tasks")
+           nil
+           :hook (lambda ()
+                   (jirassic-org-insert-issue
+                    (read-string "Enter issue key: ")
+                    ;; Here we specify what level to insert the issue at.
+                    2)))))
+#+end_src
+
 
 * Optional Features
 
