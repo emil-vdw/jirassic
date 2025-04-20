@@ -245,8 +245,8 @@ so that we can return to it when the download is complete.")
                          (f-swap-ext filename filetype)
                        filename))
                     (attachment-path
-                     (f-expand attachment-filename
-                               attach-dir)))
+                     (expand-file-name attachment-filename
+                                       attach-dir)))
                (jirassic-download-attachment
                 id attachment-path
                 :then
