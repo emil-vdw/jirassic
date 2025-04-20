@@ -3,7 +3,6 @@
 Jirassic is an Emacs package that provides a convenient interface for interacting with Jira's REST API. It allows you to create, update, delete, and retrieve Jira issues directly from Emacs, with optional integration into Org Mode.
 
 * Features
-
 ** Serialize Jira issues to Org
 - Import Jira issues into Org Mode buffers.
 
@@ -35,8 +34,16 @@ Jirassic is an Emacs package that provides a convenient interface for interactin
               (org-set-tags "jira")))
   #+END_SRC
 
-* Installation
+** Attachments
+Jirassic supports handling attachments of Jira issues.
 
+#+BEGIN_SRC emacs-lisp
+(setopt jirassic-org-add-attachments t) ; Enable downloading and attaching files
+#+END_SRC
+
+When ~jirassic-org-add-attachments~ is set to ~t~, attachments will be downloaded and attached via ~org-attach~ (see the [[https://orgmode.org/manual/Attachments.html][section on Attachments in the org manual]]). This allows you to manage attachments directly within your Org files.
+
+* Installation
 ** Using ~use-package~ and ~elpaca~
 #+begin_src emacs-lisp
   (use-package jirassic
