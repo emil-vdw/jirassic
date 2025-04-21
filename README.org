@@ -144,7 +144,15 @@ Here is an example of a capture template that inserts the contents of a Jira tas
 #+end_src
 
 
-* Optional Features
+* Planned Featurs
++ [ ] Org Roam integration
++ [ ] Viewing comments
++ [ ] Updating issues (with ediff)
++ [ ] UI for searching issues
+
+* Caveats
++ At the moment, Jirassic does not support serialization of media nodes (like you would include in an issue description). I'm not exactly sure how to do this, there doesn't seem to be a public api for fetching these?.
+  It does support media attachments though.
 
 * Dependencies
 + ~Emacs~ 29.3 or later
