@@ -26,6 +26,8 @@
 
 (require 'cl-lib)
 
+(require 'dash)
+
 (require 'jirassic-issue)
 
 

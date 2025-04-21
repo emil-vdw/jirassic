@@ -25,7 +25,11 @@
 ;;; Code:
 (require 'org)
 
+(require 'f)
+(require 's)
+
 (require 'jirassic-core)
+(require 'jirassic-issue)
 
 
 (defcustom jirassic-list-item-bullet "+"
