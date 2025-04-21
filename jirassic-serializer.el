@@ -105,7 +105,7 @@ so that we can return to it when the download is complete.")
          (level (- (+ jirassic--entry-level
                       (alist-get 'level attrs))
                    jirassic--normalized-heading-offset))
-         (content (seq-into (alist-get 'content data) 'list)))
+         (content (alist-get 'content data)))
     (org-insert-heading nil nil level)
     (mapc #'jirassic--serialize-doc-node content)
     (newline)))
@@ -372,17 +372,7 @@ normalized heading offset of a heading with level 4 in data will be:
 (defun jirassic--serialize-issue (issue &optional level)
   "Serialize a JIRA issue to an org entry."
   (let ((level (or level 1)))
-    (if (and (<= (count-lines (point-min) (point-max)) 1)
-             (save-excursion
-               (goto-char (line-beginning-position))
-               (looking-at-p "^\\s-*$")))
-        (progn
-          (goto-char (line-beginning-position))
-          (delete-line)
-          (insert
-           (s-repeat level "*") " "))
-      (org-insert-heading nil nil level))
-
+    (org-insert-heading nil nil level)
     (setq jirassic--serialized-entry-start (point-marker))
     (insert (jirassic--serialize-status (jirassic-issue-status issue))
             " "
