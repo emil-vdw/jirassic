@@ -6,8 +6,10 @@
 
 ;;; Code:
 
+(require 'org)
 (require 'ediff)
 
+(require 'jirassic-parser)
 (require 'jirassic-serializer)
 (require 'jirassic-client)
 
@@ -177,7 +179,7 @@ EPOM is an element, marker, or buffer position."
            (org-narrow-to-subtree)
            (ediff-buffers (current-buffer) buf-latest)))
        :else
-       ;; Something went wrong when fetching the issue. Still clean up
+       ;; Something went wrong when fetching the issue. Still clean up.
        (lambda (&rest args)
          (jirassic--ediff-cleanup))))))
 

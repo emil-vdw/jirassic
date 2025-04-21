@@ -23,6 +23,8 @@
 ;; Parses jira structs to org format.
 
 ;;; Code:
+(require 'org)
+
 (require 'jirassic-core)
 
 
