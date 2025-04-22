@@ -372,7 +372,7 @@ normalized heading offset of a heading with level 4 in data will be:
           ("issue-project" ,(jirassic-issue-project issue))))
   (insert ":END:\n"))
 
-(defun jirassic--serialize-issue (issue &optional level)
+(defun jirassic--serialize-issue-entry (issue &optional level)
   "Serialize a JIRA issue to an org entry.
 
 This function will insert the issue into the current buffer with

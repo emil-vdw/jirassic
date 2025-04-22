@@ -74,7 +74,7 @@ EPOM is an element, marker, or buffer position."
     (with-current-buffer buf
       (goto-char pos)
       (setq jirassic-last-inserted-issue-location
-            (jirassic--serialize-issue issue level)))))
+            (jirassic--serialize-issue-entry issue level)))))
 
 (defun jirassic--org-capture-finalize ()
   "Perform finalization after org capture of jira issues."
@@ -172,7 +172,7 @@ EPOM is an element, marker, or buffer position."
                (org-mode)
                ;; Make sure that the issue is serialized at the same level as
                ;; the current issue.
-               (jirassic--serialize-issue issue issue-level)))
+               (jirassic--serialize-issue-entry issue issue-level)))
            ;; Launch ediff
            (push buf-latest jirassic--ediff-buffers-to-cleanup)
            (switch-to-buffer (marker-buffer jirassic--issue-location-for-diff))
