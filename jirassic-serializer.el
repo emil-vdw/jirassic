@@ -62,9 +62,6 @@ difference between the largest heading level and 1.")
 See `jirassic--determine-normalized-heading-offset' for more
 information.")
 
-(defvar jirassic--serialized-entry-start nil
-  "Start marker of the last entry serialized.")
-
 (defvar jirassic--downloading-attachments-for-entry nil
   "The entry for which we are downloading attachments.
 
@@ -376,17 +373,27 @@ normalized heading offset of a heading with level 4 in data will be:
   (insert ":END:\n"))
 
 (defun jirassic--serialize-issue (issue &optional level)
-  "Serialize a JIRA issue to an org entry."
-  (let ((level (or level 1)))
+  "Serialize a JIRA issue to an org entry.
+
+This function will insert the issue into the current buffer with
+the same behavior as `org-insert-heading'. After inserting the
+issue, it will return a marker to the start of the entry."
+  (let ((level (or level 1))
+        entry-start)
     (org-insert-heading nil nil level)
-    (setq jirassic--serialized-entry-start (point-marker))
+    (save-excursion
+      (beginning-of-line)
+      (setq entry-start (point-marker)))
     (insert (jirassic--serialize-status (jirassic-issue-status issue))
             " "
             (jirassic-issue-summary issue))
     (newline)
     (jirassic--serialize-properties issue)
     (newline)
-    (jirassic--serialize-doc (jirassic-issue-description issue) level)))
+    (jirassic--serialize-doc (jirassic-issue-description issue) level)
+
+    ;; Return a marker to the start of the entry
+    entry-start))
 
 
 (provide 'jirassic-serializer)

@@ -30,8 +30,16 @@ files will be downloaded and attached to the org file via `org-attach'.")
   :type 'boolean
   :group 'jirassic)
 
-(defvar jirassic-issue-last-inserted nil
-  "Most recently inserted Jira issue for use in hooks.")
+(defvar jirassic-last-inserted-issue nil
+  "Most recently inserted Jira issue for use in hooks.
+
+Stores a Jirassic issue object.")
+
+(defvar jirassic-last-inserted-issue-location nil
+  "Last location of the inserted issue.
+
+This is a marker pointing to the start location of the last inserted
+issue.")
 
 (defvar jirassic--ediff-buffers-to-cleanup nil
   "List of buffers to clean up after jirassic ediff exits.")
@@ -56,7 +64,7 @@ EPOM is an element, marker, or buffer position."
              (jirassic--is-jira-issue)
              buffer-file-name)
     (jirassic--serialize-attachments
-     (jirassic-issue-attachments jirassic-issue-last-inserted))))
+     (jirassic-issue-attachments jirassic-last-inserted-issue))))
 
 (defun jirassic--org-insert-issue-at (buf pos issue &optional level)
   "Insert a Jira issue into the current buffer."
@@ -65,7 +73,8 @@ EPOM is an element, marker, or buffer position."
   (save-excursion
     (with-current-buffer buf
       (goto-char pos)
-      (jirassic--serialize-issue issue level))))
+      (setq jirassic-last-inserted-issue-location
+            (jirassic--serialize-issue issue level)))))
 
 (defun jirassic--org-capture-finalize ()
   "Perform finalization after org capture of jira issues."
@@ -110,7 +119,7 @@ EPOM is an element, marker, or buffer position."
                         :then
                         (lambda (data)
                           (let ((issue (jirassic--parse-issue data)))
-                            (setq jirassic-issue-last-inserted issue)
+                            (setq jirassic-last-inserted-issue issue)
                             (jirassic--org-insert-issue-at
                              (marker-buffer where-to-insert)
                              (marker-position where-to-insert)
@@ -120,8 +129,8 @@ EPOM is an element, marker, or buffer position."
                             ;; making sure to go to the start of the entry before
                             ;; running the hooks.
                             (save-excursion
-                              (with-current-buffer (marker-buffer jirassic--serialized-entry-start)
-                                (goto-char (marker-position jirassic--serialized-entry-start))
+                              (with-current-buffer (marker-buffer jirassic-last-inserted-issue-location)
+                                (goto-char (marker-position jirassic-last-inserted-issue-location))
                                 (run-hooks 'jirassic-org-after-insert-hook))))))))
 
 
