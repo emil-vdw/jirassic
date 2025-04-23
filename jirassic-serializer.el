@@ -283,7 +283,7 @@ everything by 2. Now if we're inserting at a starting level of 3, then
 normalized heading offset of a heading with level 4 in data will be:
 '4 + 3 - 2 = 5' where 2 is the offset we are calculating.
 "
-  (let ((min-level nil))
+  (let ((min-level 0))
     (cl-labels
         ((walk (n)
            (cond

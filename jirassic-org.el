@@ -9,6 +9,8 @@
 (require 'org)
 (require 'ediff)
 
+(require 'aio)
+
 (require 'jirassic-parser)
 (require 'jirassic-serializer)
 (require 'jirassic-client)
@@ -66,16 +68,6 @@ EPOM is an element, marker, or buffer position."
     (jirassic--serialize-attachments
      (jirassic-issue-attachments jirassic-last-inserted-issue))))
 
-(defun jirassic--org-insert-issue-at (buf pos issue &optional level)
-  "Insert a Jira issue into the current buffer."
-  (unless (buffer-live-p buf)
-    (error "Buffer no longer live"))
-  (save-excursion
-    (with-current-buffer buf
-      (goto-char pos)
-      (setq jirassic-last-inserted-issue-location
-            (jirassic--serialize-issue-entry issue level)))))
-
 (defun jirassic--org-capture-finalize ()
   "Perform finalization after org capture of jira issues."
   (with-current-buffer (marker-buffer org-capture-last-stored-marker)
@@ -83,7 +75,7 @@ EPOM is an element, marker, or buffer position."
     (when (jirassic--is-jira-issue)
       (jirassic--maybe-download-org-attachments))))
 
-(defun jirassic--ediff-cleanup ()
+(defun jirassic--issue-diff-cleanup ()
   "Cleanup buffers created by jirassic ediff."
   (mapc #'kill-buffer jirassic--ediff-buffers-to-cleanup)
   (setq jirassic--ediff-buffers-to-cleanup nil)
@@ -100,7 +92,7 @@ EPOM is an element, marker, or buffer position."
   (setq jirassic--issue-location-for-diff nil))
 
 ;;;###autoload
-(defun jirassic-org-insert-issue (key &optional level)
+(aio-defun jirassic-org-insert-issue (key &optional level)
   "Insert a Jira issue into the current buffer."
   (interactive
    (list (read-string "Enter issue key: ")
@@ -110,89 +102,72 @@ EPOM is an element, marker, or buffer position."
 
   (unless (derived-mode-p 'org-mode)
     (error "Cannot insert issue in non-org buffer"))
-  (let (
-        ;; Store the current point and buffer so we can return to it
-        ;; later when inserting the issue.
-        (where-to-insert (point-marker)))
-    (message "Fetching issue %s..." key)
-    (jirassic-get-issue key
-                        :then
-                        (lambda (data)
-                          (let ((issue (jirassic--parse-issue data)))
-                            (setq jirassic-last-inserted-issue issue)
-                            (jirassic--org-insert-issue-at
-                             (marker-buffer where-to-insert)
-                             (marker-position where-to-insert)
-                             issue
-                             level)
-                            ;; We need to run the hooks after inserting the issue,
-                            ;; making sure to go to the start of the entry before
-                            ;; running the hooks.
-                            (save-excursion
-                              (with-current-buffer (marker-buffer jirassic-last-inserted-issue-location)
-                                (goto-char (marker-position jirassic-last-inserted-issue-location))
-                                (run-hooks 'jirassic-org-after-insert-hook))))))))
+
+  (message "Fetching issue %s..." key)
+  (jirassic-bind-restore ((issue (jirassic--parse-issue
+                                  (aio-await (jirassic-get-issue key)))))
+
+    ;; Make sure to return to the start of where we insert the issue
+    ;; before running the hooks.
+    (goto-char
+     (marker-position (jirassic--serialize-issue-entry issue level)))
+    (setq jirassic-last-inserted-issue issue)
+    (run-hooks 'jirassic-org-after-insert-hook)))
 
 
 ;;;###autoload
-(defun jirassic-org-view-issue-changes ()
+(aio-defun jirassic-org-view-issue-changes ()
   "Ediff the current Org-mode Jira entry against the latest version.
 
 1. Grab `issue-id` and `issue-key` from the current Org entry properties.
 2. Copy the current subtree into buffer `*jira-<ID>-current*`.
 3. Fetch the issue from Jira, parse and serialize it into `*jira-<ID>-latest*`.
 4. Call `ediff-buffers` on the two temp buffers."
-  ;; XXX: What if we fail to fetch the issue? Clean up the buffer.
   (interactive)
   (when jirassic--issue-location-for-diff
     (error "Already requesting issue changes"))
   (unless (derived-mode-p 'org-mode)
     (user-error "Not in Org-mode buffer"))
   (setq jirassic--initial-window-configuration (current-window-configuration))
-  ;; Narrow to the current entry
-  (save-excursion
-    (org-back-to-heading t)
-    (let* ((issue-level (org-current-level))
+  (condition-case err
+      (jirassic-bind-restore
+          ((issue-level (org-current-level))
            (id   (org-entry-get nil "issue-id"))
            (key  (org-entry-get nil "issue-key"))
            (buf-latest
-            (get-buffer-create (format "*jira-%s-latest*" id))))
-      (setq jirassic--issue-location-for-diff
-            (point-marker))
-      ;; Fetch and serialize latest issue
-      (message "Fetching latest data for issue %s..." key)
-      (jirassic-get-issue
-       key
-       :then
-       (lambda (data)
-         (let ((issue (jirassic--parse-issue data)))
-           (with-current-buffer buf-latest
-             (let ((inhibit-read-only t))
-               (erase-buffer)
-               (org-mode)
-               ;; Make sure that the issue is serialized at the same level as
-               ;; the current issue.
-               (jirassic--serialize-issue-entry issue issue-level)))
-           ;; Launch ediff
-           (push buf-latest jirassic--ediff-buffers-to-cleanup)
-           (switch-to-buffer (marker-buffer jirassic--issue-location-for-diff))
-           ;; Store the current narrowing so we can restore it for the
-           ;; user after the ediff session concludes.
-           (setq jirassic--diff-issue-original-narrowing
-                 (when (buffer-narrowed-p)
-                   (list (point-min) (point-max))))
-           (when (buffer-narrowed-p)
-             (widen))
+            (get-buffer-create (format "*jira-%s-latest*" id)))
+           (issue-latest (progn
+                           (message "Fetching latest data for issue %s..." key)
+                           (jirassic--parse-issue
+                            (aio-await (jirassic-get-issue key))))))
 
-           (goto-char (marker-position jirassic--issue-location-for-diff))
-           (org-narrow-to-subtree)
-           (ediff-buffers (current-buffer) buf-latest)))
-       :else
-       ;; Something went wrong when fetching the issue. Still clean up.
-       (lambda (&rest args)
-         (jirassic--ediff-cleanup))))))
+        (setq jirassic--issue-location-for-diff (point-marker))
+        (with-current-buffer buf-latest
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (org-mode)
+            ;; Make sure that the issue is serialized at the same level as
+            ;; the current issue.
+            (jirassic--serialize-issue-entry issue-latest issue-level)))
 
-(add-hook 'ediff-quit-hook #'jirassic--ediff-cleanup)
+        (push buf-latest jirassic--ediff-buffers-to-cleanup)
+        ;; Store the current narrowing so we can restore it for the
+        ;; user after the ediff session concludes.
+        (setq jirassic--diff-issue-original-narrowing
+              (when (buffer-narrowed-p)
+                (list (point-min) (point-max))))
+        (when (buffer-narrowed-p)
+          (widen))
+
+        (org-narrow-to-subtree)
+        (ediff-buffers (current-buffer) buf-latest))
+
+    ;; Clean up even if there's an error.
+    (error (progn
+             (jirassic--issue-diff-cleanup)
+             (signal (car err) (cdr err))))))
+
+(add-hook 'ediff-quit-hook #'jirassic--issue-diff-cleanup)
 (add-hook 'jirassic-org-after-insert-hook #'jirassic--maybe-download-org-attachments)
 (add-hook 'org-capture-after-finalize-hook #'jirassic--org-capture-finalize)
 
