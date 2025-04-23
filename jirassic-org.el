@@ -104,16 +104,21 @@ EPOM is an element, marker, or buffer position."
     (error "Cannot insert issue in non-org buffer"))
 
   (message "Fetching issue %s..." key)
-  (jirassic-bind-restore ((issue (jirassic--parse-issue
-                                  (aio-await (jirassic-get-issue key)))))
+  (condition-case err
+      (jirassic-bind-restore ((issue (aio-await (jirassic-get-issue key))))
 
-    ;; Make sure to return to the start of where we insert the issue
-    ;; before running the hooks.
-    (goto-char
-     (marker-position (jirassic--serialize-issue-entry issue level)))
-    (setq jirassic-last-inserted-issue issue)
-    (run-hooks 'jirassic-org-after-insert-hook)))
-
+        ;; Make sure to return to the start of where we insert the issue
+        ;; before running the hooks.
+        (goto-char
+         (marker-position (jirassic--serialize-issue-entry issue level)))
+        (setq jirassic-last-inserted-issue issue)
+        (run-hooks 'jirassic-org-after-insert-hook))
+    (jirassic-client-error
+     (let ((client-error (cdr err)))
+       (message "Error fetching issue %s: %s"
+                (propertize key 'face 'bold)
+                (jirassic-http-error-message
+                 client-error))))))
 
 ;;;###autoload
 (aio-defun jirassic-org-view-issue-changes ()
@@ -138,8 +143,7 @@ EPOM is an element, marker, or buffer position."
             (get-buffer-create (format "*jira-%s-latest*" id)))
            (issue-latest (progn
                            (message "Fetching latest data for issue %s..." key)
-                           (jirassic--parse-issue
-                            (aio-await (jirassic-get-issue key))))))
+                           (aio-await (jirassic-get-issue key)))))
 
         (setq jirassic--issue-location-for-diff (point-marker))
         (with-current-buffer buf-latest

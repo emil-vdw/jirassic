@@ -6,10 +6,12 @@
 
 ;;; Code:
 
+(require 'auth-source)
+
 (require 'aio)
 (require 'request)
 
-(require 'auth-source)
+(require 'jirassic-parser)
 
 
 (defcustom jirassic-host nil
@@ -39,7 +41,7 @@
         :type string
         :documentation "Response body."))
 
-(cl-defstruct jirassic-client-error
+(cl-defstruct jirassic-http-error
   "A Jira client error."
   (message nil
            :read-only t
@@ -84,7 +86,7 @@
 
 (defun jirassic--default-error-handler (err)
   "Default error handler for Jira API errors."
-  (error "Jira API error: %s" (jirassic-client-error-message err)))
+  (error "Jira API error: %s" (jirassic-http-error-message err)))
 
 (cl-defun jirassic--parse-client-error (error-thrown response)
   "Parse a client error from the Jira API response.
@@ -108,12 +110,12 @@ ERROR-THROWN is the error thrown by the request. RESPONSE is the
                (t (if (stringp error-thrown)
                       error-thrown
                     (format "%s" error-thrown))))))
-        (make-jirassic-client-error
+        (make-jirassic-http-error
          :message message
          :code status
          :response response))
 
-    (make-jirassic-client-error
+    (make-jirassic-http-error
      :message (format "An error occurred: %s" error-thrown)
      :code nil
      :response nil)))
@@ -160,21 +162,20 @@ an alist of query parameters to include in the request."
       (cl-function (lambda (&key data &allow-other-keys)
                      (aio-resolve promise (lambda () data))))
       :error
-      (lambda (err)
-        (cl-function
-         (lambda (&key data error-thrown symbol-status response &allow-other-keys)
-           (aio-resolve promise
-                        (lambda (err)
-                          (signal 'jirassic-client-error
-                                  (jirassic--parse-client-error
-                                   error-thrown
-                                   response))))))))
+      (cl-function
+       (lambda (&key data error-thrown symbol-status response &allow-other-keys)
+         (aio-resolve promise
+                      (lambda ()
+                        (signal 'jirassic-client-error
+                                (jirassic--parse-client-error
+                                 error-thrown
+                                 response)))))))
 
     promise))
 
-(cl-defun jirassic-get-issue (key)
+(aio-defun jirassic-get-issue (key)
   "Get a Jira issue by KEY."
-  (jirassic--get (list "issue" key)))
+  (jirassic--parse-issue (aio-await (jirassic--get (list "issue" key)))))
 
 (cl-defun jirassic-download-attachment (id to &key then else)
   "Download a Jira attachment by ID to a local file TO."
