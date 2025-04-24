@@ -146,7 +146,7 @@ EPOM is an element, marker, or buffer position."
                  client-error))))))
 
 ;;;###autoload
-(aio-defun jirassic-org-view-issue-changes ()
+(aio-defun jirassic-org-update-issue-entry ()
   "Ediff the current Org-mode Jira entry against the latest version.
 
 1. Grab `issue-id` and `issue-key` from the current Org entry properties.
