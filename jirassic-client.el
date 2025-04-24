@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 
-
+;; Fetch and parse Jira issues and attachments from the Jira API.
 
 ;;; Code:
 
@@ -89,7 +89,7 @@
   "Default error handler for Jira API errors."
   (error "Jira API error: %s" (jirassic-http-error-message err)))
 
-(cl-defun jirassic--parse-client-error (error-thrown response)
+(cl-defun jirassic--parse-http-error (error-thrown response)
   "Parse a client error from the Jira API response.
 
 ERROR-THROWN is the error thrown by the request. RESPONSE is the
@@ -131,7 +131,7 @@ ERROR-THROWN is the error thrown by the request. RESPONSE is the
 (cl-defmacro jirassic--error-callback (callback-function)
   `(cl-function (lambda (&key data error-thrown symbol-status response &allow-other-keys)
                   (funcall ,callback-function
-                           (jirassic--parse-client-error
+                           (jirassic--parse-http-error
                             error-thrown
                             response)))))
 
@@ -168,7 +168,7 @@ an alist of query parameters to include in the request."
          (aio-resolve promise
                       (lambda ()
                         (signal 'jirassic-client-error
-                                (jirassic--parse-client-error
+                                (jirassic--parse-http-error
                                  error-thrown
                                  response)))))))
 

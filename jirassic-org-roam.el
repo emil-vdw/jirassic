@@ -102,9 +102,9 @@ variables, see the `jirassic-roam-capture-templates' variable."
                            :templates jirassic-roam-capture-templates))
 
     (jirassic-client-error
-     (message "Error fetching issue %s: %s"
+     (message "Error fetching issue '%s': %s"
               issue-key
-              (jirassic-client-error-message err)))
+              (jirassic-http-error-message (cdr err))))
     (error
      (message "Error capturing issue %s: %s"
               issue-key

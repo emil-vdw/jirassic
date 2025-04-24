@@ -76,7 +76,7 @@ EPOM is an element, marker, or buffer position."
             (jirassic--maybe-download-org-attachments)
           (jirassic-client-error
            (message "Error downloading attachments: %s"
-                    (jirassic-http-error-message err)))
+                    (jirassic-http-error-message (cdr err))))
           (error
            (message "Error downloading attachments: %s"
                     (error-message-string err))))))))
