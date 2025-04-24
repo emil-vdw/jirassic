@@ -24,7 +24,8 @@
   :type 'boolean
   :group 'jirassic)
 
-(define-error 'jirassic-client-error "An HTTP client error occurred")
+(define-error 'jirassic-client-error
+              "An error occurred while communicating with the Jira API.")
 
 (cl-defstruct jirassic-client-response
   "A Jira client response."

@@ -52,9 +52,6 @@ issue.")
 (defvar jirassic--issue-location-for-diff nil
   "Marker for the location of the issue being diffed.")
 
-(defvar jirassic--diff-issue-original-narrowing nil
-  "Marker for the location of the issue being diffed.")
-
 (defun jirassic-org-issue-entry-p (&optional epom)
   "Check if org entry at EPOM is a jira issue.
 
@@ -75,7 +72,14 @@ EPOM is an element, marker, or buffer position."
     (with-current-buffer (marker-buffer org-capture-last-stored-marker)
       (goto-char (marker-position org-capture-last-stored-marker))
       (when (jirassic-org-issue-entry-p)
-        (jirassic--maybe-download-org-attachments)))))
+        (condition-case err
+            (jirassic--maybe-download-org-attachments)
+          (jirassic-client-error
+           (message "Error downloading attachments: %s"
+                    (jirassic-http-error-message err)))
+          (error
+           (message "Error downloading attachments: %s"
+                    (error-message-string err))))))))
 
 (defun jirassic--issue-ediff-cleanup ()
   "Cleanup buffers created by jirassic ediff."
@@ -89,13 +93,6 @@ EPOM is an element, marker, or buffer position."
     (unless jirassic--initial-window-configuration
       (error "Initial window configuration not saved"))
     (set-window-configuration jirassic--initial-window-configuration))
-  (with-current-buffer (marker-buffer jirassic--issue-location-for-diff)
-    (if jirassic--diff-issue-original-narrowing
-        (narrow-to-region
-         (car jirassic--diff-issue-original-narrowing)
-         (cadr jirassic--diff-issue-original-narrowing))
-      (widen))
-    (read-only-mode -1))
   (setq jirassic--issue-location-for-diff nil))
 
 (defun jirassic--after-issue-merge ()
@@ -107,12 +104,14 @@ EPOM is an element, marker, or buffer position."
                  (buffer-substring-no-properties (point-min) (point-max)))))
           ;; XXX: What if the buffer has been closed?
           (with-current-buffer (marker-buffer jirassic--issue-location-for-diff)
-            (save-excursion
-              (org-back-to-heading t)
-              (org-narrow-to-subtree)
-              (let ((inhibit-read-only t))
-                (delete-region (point-min) (point-max))
-                (insert updated-issue))))))
+            (save-restriction
+              (save-excursion
+                (widen)
+                (org-back-to-heading t)
+                (org-narrow-to-subtree)
+                (let ((inhibit-read-only t))
+                  (delete-region (point-min) (point-max))
+                  (insert updated-issue)))))))
     (jirassic--issue-ediff-cleanup)))
 
 ;;;###autoload
@@ -154,20 +153,33 @@ EPOM is an element, marker, or buffer position."
 4. Call `ediff-buffers` on the two temp buffers."
   (interactive)
   (when jirassic--issue-location-for-diff
-    (error "Already requesting issue changes"))
+    (user-error "Already requesting issue changes"))
   (unless (derived-mode-p 'org-mode)
     (user-error "Not in Org-mode buffer"))
+  (unless (jirassic-org-issue-entry-p)
+    (user-error "Not in a Jira issue entry"))
+
+  ;; Store the window configuration before we start the ediff session
+  ;; so that we can restore it later.
   (setq jirassic--initial-window-configuration (current-window-configuration))
   (condition-case err
       (jirassic-bind-restore
           ((issue-level (org-current-level))
            (id   (org-entry-get nil "issue-id"))
            (key  (org-entry-get nil "issue-key"))
+           (buf-current
+            (get-buffer-create (format "*jira-%s-current*" id)))
            (buf-latest
             (get-buffer-create (format "*jira-%s-latest*" id)))
            (issue-latest (progn
                            (message "Fetching latest data for issue %s..." key)
-                           (aio-await (jirassic-get-issue key)))))
+                           (aio-await (jirassic-get-issue key))))
+           (current-issue-content
+            (save-restriction
+              (save-excursion
+                (widen)
+                (org-narrow-to-subtree)
+                (buffer-substring-no-properties (point-min) (point-max))))))
 
         (setq jirassic--issue-location-for-diff (point-marker))
         (with-current-buffer buf-latest
@@ -178,21 +190,23 @@ EPOM is an element, marker, or buffer position."
             ;; the current issue.
             (jirassic--serialize-issue-entry issue-latest issue-level)))
 
-        (push buf-latest jirassic--ediff-buffers-to-cleanup)
-        ;; Store the current narrowing so we can restore it for the
-        ;; user after the ediff session concludes.
-        (setq jirassic--diff-issue-original-narrowing
-              (when (buffer-narrowed-p)
-                (list (point-min) (point-max))))
-        (when (buffer-narrowed-p)
-          (widen))
+        (with-current-buffer buf-current
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (org-mode)
+            ;; Make sure that the issue is serialized at the same level as
+            ;; the current issue.
+            (insert current-issue-content)))
 
-        (org-narrow-to-subtree)
-        (ediff-merge-buffers (current-buffer) buf-latest
+        (push buf-current jirassic--ediff-buffers-to-cleanup)
+        (push buf-latest jirassic--ediff-buffers-to-cleanup)
+
+        (ediff-merge-buffers buf-current buf-latest
                              (list
                               (lambda ()
                                 (setq-local ediff-quit-merge-hook
-                                            (cons jirassic--after-issue-merge ediff-quit-merge-hook))))))
+                                            (cons #'jirassic--after-issue-merge
+                                                  ediff-quit-merge-hook))))))
 
     ;; Clean up even if there's an error.
     (jirassic-client-error
