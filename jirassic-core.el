@@ -5,6 +5,9 @@
 
 
 ;;; Code:
+(defvar jirassic--issue-link-pattern
+  "^https://[^/]+/browse/\\([A-Za-z0-9_]\\{2,10\\}-[0-9]\\{1,10\\}\\)$")
+
 (defun jirassic-alist-nget (keys alist)
   "Get the value of a key in an alist."
   (if (seqp keys)
@@ -36,6 +39,18 @@ restored, and BODY is executed within that context."
            ;; Add check for marker validity for extra safety
            (goto-char (marker-position ,restore-to))
            ,@body)))))
+
+(defun jirassic-issue-link-p (link)
+  "Check if LINK is a valid Jira issue link."
+  (and (stringp link)
+       (string-match-p jirassic--issue-link-pattern link)))
+
+(defun jirassic-issue-key-from-link (link)
+  "Extract the issue key from a Jira issue LINK."
+  (save-match-data
+    (if (string-match jirassic--issue-link-pattern link)
+        (match-string 1 link)
+      (error "Invalid Jira issue link"))))
 
 (provide 'jirassic-core)
 ;;; jirassic-core.el ends here

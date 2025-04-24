@@ -318,6 +318,12 @@ normalized heading offset of a heading with level 4 in data will be:
             0))
   (jirassic--serialize-doc-node doc))
 
+(defun jirassic--doc-string (doc &optional level)
+  (with-temp-buffer
+    (org-mode)
+    (jirassic--serialize-doc doc level)
+    (buffer-string)))
+
 (defun jirassic--serialize-doc-node (node)
   "Serialize ADF objects to org strings."
   (let ((type (alist-get 'type node)))
@@ -357,19 +363,20 @@ normalized heading offset of a heading with level 4 in data will be:
      (t
       (message "Unknown type: %s" type)))))
 
-(defun jirassic--serialize-properties (issue)
+(defun jirassic--serialize-properties (issue &optional extra-properties)
   "Set org entry properties for the given ISSUE."
   (insert ":PROPERTIES:\n")
   (mapc (lambda (property)
           (insert (format ":%s: %s\n"
                           (car property) (cadr property))))
-        `(("issue-link" ,(jirassic-issue-link issue))
-          ("issue-id" ,(jirassic-issue-id issue))
-          ("issue-key" ,(jirassic-issue-key issue))
-          ("issue-type" ,(jirassic-issue-type issue))
-          ("issue-creator" ,(jirassic-user-display-name
-                             (jirassic-issue-creator issue)))
-          ("issue-project" ,(jirassic-issue-project issue))))
+        (append extra-properties
+                `(("issue-key" ,(jirassic-issue-key issue))
+                  ("issue-link" ,(jirassic-issue-link issue))
+                  ("issue-id" ,(jirassic-issue-id issue))
+                  ("issue-type" ,(jirassic-issue-type issue))
+                  ("issue-creator" ,(jirassic-user-display-name
+                                     (jirassic-issue-creator issue)))
+                  ("issue-project" ,(jirassic-issue-project issue)))))
   (insert ":END:\n"))
 
 (defun jirassic--serialize-issue-entry (issue &optional level)
