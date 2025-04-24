@@ -55,7 +55,7 @@ issue.")
 (defvar jirassic--diff-issue-original-narrowing nil
   "Marker for the location of the issue being diffed.")
 
-(defun jirassic--is-jira-issue (&optional epom)
+(defun jirassic-org-issue-entry-p (&optional epom)
   "Check if org entry at EPOM is a jira issue.
 
 EPOM is an element, marker, or buffer position."
@@ -63,17 +63,19 @@ EPOM is an element, marker, or buffer position."
 
 (defun jirassic--maybe-download-org-attachments ()
   (when (and jirassic-org-add-attachments
-             (jirassic--is-jira-issue)
+             (jirassic-org-issue-entry-p)
              buffer-file-name)
     (jirassic--serialize-attachments
      (jirassic-issue-attachments jirassic-last-inserted-issue))))
 
 (defun jirassic--org-capture-finalize ()
   "Perform finalization after org capture of jira issues."
-  (with-current-buffer (marker-buffer org-capture-last-stored-marker)
-    (goto-char (marker-position org-capture-last-stored-marker))
-    (when (jirassic--is-jira-issue)
-      (jirassic--maybe-download-org-attachments))))
+  (when (and org-capture-last-stored-marker
+             (buffer-live-p (marker-buffer org-capture-last-stored-marker)))
+    (with-current-buffer (marker-buffer org-capture-last-stored-marker)
+      (goto-char (marker-position org-capture-last-stored-marker))
+      (when (jirassic-org-issue-entry-p)
+        (jirassic--maybe-download-org-attachments)))))
 
 (defun jirassic--issue-ediff-cleanup ()
   "Cleanup buffers created by jirassic ediff."
