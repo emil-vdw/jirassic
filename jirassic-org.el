@@ -85,10 +85,10 @@ EPOM is an element, marker, or buffer position."
   "Cleanup buffers created by jirassic ediff."
   (mapc #'kill-buffer jirassic--ediff-buffers-to-cleanup)
   (setq jirassic--ediff-buffers-to-cleanup nil)
-  (when ediff-control-buffer
-    (kill-buffer ediff-control-buffer))
   (when ediff-buffer-C
     (kill-buffer ediff-buffer-C))
+  (when ediff-control-buffer
+    (kill-buffer ediff-control-buffer))
   (when jirassic-restore-windows-after-diff
     (unless jirassic--initial-window-configuration
       (error "Initial window configuration not saved"))
@@ -99,6 +99,8 @@ EPOM is an element, marker, or buffer position."
   "After merging the issue, save the changes to the original buffer."
   (unwind-protect
       (when (y-or-n-p "Save changes to the merged issue?")
+        (unless (buffer-live-p (marker-buffer jirassic--issue-location-for-diff))
+          (error "Buffer for issue no longer exists"))
         (let ((updated-issue
                (with-current-buffer ediff-buffer-C
                  (buffer-substring-no-properties (point-min) (point-max)))))
@@ -152,16 +154,27 @@ EPOM is an element, marker, or buffer position."
 3. Fetch the issue from Jira, parse and serialize it into `*jira-<ID>-latest*`.
 4. Call `ediff-buffers` on the two temp buffers."
   (interactive)
-  (when jirassic--issue-location-for-diff
-    (user-error "Already requesting issue changes"))
-  (unless (derived-mode-p 'org-mode)
-    (user-error "Not in Org-mode buffer"))
-  (unless (jirassic-org-issue-entry-p)
-    (user-error "Not in a Jira issue entry"))
 
-  ;; Store the window configuration before we start the ediff session
-  ;; so that we can restore it later.
-  (setq jirassic--initial-window-configuration (current-window-configuration))
+  ;; Handle these user errors and message explicitly because
+  ;; these `user-error's that happen in async interactive
+  ;; functions are not reported to the user.
+  (condition-case err
+      (progn
+        (when jirassic--issue-location-for-diff
+          (user-error "Already requesting issue changes"))
+        (unless (derived-mode-p 'org-mode)
+          (user-error "Not in Org-mode buffer"))
+        (unless (jirassic-org-issue-entry-p)
+          (user-error "Not in a Jira issue entry"))
+        ;; Store the window configuration before we start the ediff session
+        ;; so that we can restore it later.
+        (setq jirassic--initial-window-configuration (current-window-configuration)))
+
+    (user-error
+     (message (error-message-string err))
+     (setq jirassic--initial-window-configuration nil)
+     (signal (car err) (cdr err))))
+
   (condition-case err
       (jirassic-bind-restore
           ((issue-level (org-current-level))
@@ -217,6 +230,8 @@ EPOM is an element, marker, or buffer position."
        (jirassic--issue-ediff-cleanup)))
 
     (error (progn
+             ;; Notify the user of the error and re-raise
+             (message (error-message-string err))
              (jirassic--issue-ediff-cleanup)
              (signal (car err) (cdr err))))))
 
