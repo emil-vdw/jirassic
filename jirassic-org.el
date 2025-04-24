@@ -75,10 +75,14 @@ EPOM is an element, marker, or buffer position."
     (when (jirassic--is-jira-issue)
       (jirassic--maybe-download-org-attachments))))
 
-(defun jirassic--issue-diff-cleanup ()
+(defun jirassic--issue-ediff-cleanup ()
   "Cleanup buffers created by jirassic ediff."
   (mapc #'kill-buffer jirassic--ediff-buffers-to-cleanup)
   (setq jirassic--ediff-buffers-to-cleanup nil)
+  (when ediff-control-buffer
+    (kill-buffer ediff-control-buffer))
+  (when ediff-buffer-C
+    (kill-buffer ediff-buffer-C))
   (when jirassic-restore-windows-after-diff
     (unless jirassic--initial-window-configuration
       (error "Initial window configuration not saved"))
@@ -88,8 +92,26 @@ EPOM is an element, marker, or buffer position."
         (narrow-to-region
          (car jirassic--diff-issue-original-narrowing)
          (cadr jirassic--diff-issue-original-narrowing))
-      (widen)))
+      (widen))
+    (read-only-mode -1))
   (setq jirassic--issue-location-for-diff nil))
+
+(defun jirassic--after-issue-merge ()
+  "After merging the issue, save the changes to the original buffer."
+  (unwind-protect
+      (when (y-or-n-p "Save changes to the merged issue?")
+        (let ((updated-issue
+               (with-current-buffer ediff-buffer-C
+                 (buffer-substring-no-properties (point-min) (point-max)))))
+          ;; XXX: What if the buffer has been closed?
+          (with-current-buffer (marker-buffer jirassic--issue-location-for-diff)
+            (save-excursion
+              (org-back-to-heading t)
+              (org-narrow-to-subtree)
+              (let ((inhibit-read-only t))
+                (delete-region (point-min) (point-max))
+                (insert updated-issue))))))
+    (jirassic--issue-ediff-cleanup)))
 
 ;;;###autoload
 (aio-defun jirassic-org-insert-issue (key &optional level)
@@ -164,14 +186,24 @@ EPOM is an element, marker, or buffer position."
           (widen))
 
         (org-narrow-to-subtree)
-        (ediff-buffers (current-buffer) buf-latest))
+        (ediff-merge-buffers (current-buffer) buf-latest
+                             (list
+                              (lambda ()
+                                (setq-local ediff-quit-merge-hook
+                                            (cons jirassic--after-issue-merge ediff-quit-merge-hook))))))
 
     ;; Clean up even if there's an error.
+    (jirassic-client-error
+     (let ((client-error (cdr err)))
+       (message "Error fetching issue %s: %s"
+                (propertize key 'face 'bold)
+                (jirassic-http-error-message client-error))
+       (jirassic--issue-ediff-cleanup)))
+
     (error (progn
-             (jirassic--issue-diff-cleanup)
+             (jirassic--issue-ediff-cleanup)
              (signal (car err) (cdr err))))))
 
-(add-hook 'ediff-quit-hook #'jirassic--issue-diff-cleanup)
 (add-hook 'jirassic-org-after-insert-hook #'jirassic--maybe-download-org-attachments)
 (add-hook 'org-capture-after-finalize-hook #'jirassic--org-capture-finalize)
 
