@@ -17,8 +17,12 @@
 
 ;;; Code:
 (require 'aio)
-(require 'jirassic)
 (require 'org-roam)
+
+(require 'jirassic-client)
+(require 'jirassic-core)
+(require 'jirassic-issue)
+(require 'jirassic-serializer)
 
 (defcustom jirassic-roam-capture-templates
   `(("i" "Issue" plain "%?"
