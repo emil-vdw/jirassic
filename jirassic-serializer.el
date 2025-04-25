@@ -68,10 +68,10 @@ information.")
 This stores a marker to the entry when the download starts
 so that we can return to it when the download is complete.")
 
-(defun jirassic--serialize-status (jira-status)
+(defun jirassic--jira-to-org-status (jira-status)
   "Serialize a JIRA status to an org string."
   (alist-get "To Do" jirassic-org-todo-state-alist
-             nil nil #'string-equal))
+             jira-status nil #'string-equal))
 
 (defun jirassic--serialize-text (data)
   "Serialize ADF text objects to org strings."
@@ -391,7 +391,7 @@ issue, it will return a marker to the start of the entry."
     (save-excursion
       (beginning-of-line)
       (setq entry-start (point-marker)))
-    (insert (jirassic--serialize-status (jirassic-issue-status issue))
+    (insert (jirassic--jira-to-org-status (jirassic-issue-status issue))
             " "
             (jirassic-issue-summary issue))
     (newline)
