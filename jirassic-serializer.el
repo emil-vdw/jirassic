@@ -79,9 +79,10 @@ so that we can return to it when the download is complete.")
           ;; There is an edge case here where the text is a checkbox.
           ;; Jira uses a lowercase x for filled checkboxes, but we need to
           ;; convert it to an uppercase X for org mode.
-          (s-replace-regexp "^\\[x\\]"
-                            "[X]"
-                            (alist-get 'text data)))
+          (save-match-data
+            (replace-regexp-in-string "^\\[x\\]"
+                                      "[X]"
+                                      (alist-get 'text data))))
          (marks (alist-get 'marks data)))
     (insert
      (seq-reduce (lambda (formatted-text mark)
@@ -283,7 +284,7 @@ everything by 2. Now if we're inserting at a starting level of 3, then
 normalized heading offset of a heading with level 4 in data will be:
 '4 + 3 - 2 = 5' where 2 is the offset we are calculating.
 "
-  (let ((min-level 0))
+  (let ((min-level nil))
     (cl-labels
         ((walk (n)
            (cond
@@ -304,8 +305,10 @@ normalized heading offset of a heading with level 4 in data will be:
                  (seq-map #'walk content))))))
       (walk data))
 
-    (max (- min-level 1)
-         0)))
+    (if min-level
+        (max (- min-level 1)
+             0)
+      0)))
 
 (defun jirassic--serialize-doc (doc &optional level)
   (setq jirassic--list-depth 0)
@@ -320,9 +323,12 @@ normalized heading offset of a heading with level 4 in data will be:
 
 (defun jirassic--doc-string (doc &optional level)
   (with-temp-buffer
-    (org-mode)
-    (jirassic--serialize-doc doc level)
-    (buffer-string)))
+    (save-match-data
+      (org-mode)
+      (jirassic--serialize-doc doc level)
+      (buffer-substring-no-properties
+       (point-min)
+       (point-max)))))
 
 (defun jirassic--serialize-doc-node (node)
   "Serialize ADF objects to org strings."
