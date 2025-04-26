@@ -164,6 +164,30 @@ EPOM is an element, marker, or buffer position."
                 (jirassic-http-error-message
                  client-error))))))
 
+(defun jirassic--expand-template-for-diff (issue template-keys)
+  "Expand the specified Jira issue template for diffing.
+
+ISSUE is the `jirassic-issue' struct with the latest data.
+TEMPLATE-KEYS is the string key (e.g., \"t\", \"i\") identifying the template.
+
+Returns the expanded template content as a string."
+  (let* ((template-defs jirassic-org-capture-templates)
+         (template-found (assoc template-keys template-defs)))
+    (unless template-found
+      (error "Template key '%s' not found for type '%s'" template-keys template-type))
+
+    (with-temp-buffer
+      ;; Set up the context needed for template expansion, similar to capture
+      (jirassic--with-issue-context-funcs issue
+        (let* ((template-definition (nth 4 template-found)) ; Get the template content part
+               (template-string (if (stringp template-definition)
+                                    template-definition
+                                  ;; Handle function/file templates if necessary (more complex)
+                                  (error "Only string templates supported for diff currently"))))
+          (insert (org-capture-fill-template template-string))
+          ;; XXX: Align all headings with source buffer heading levels
+          (buffer-string))))))
+
 ;;;###autoload
 (aio-defun jirassic-org-update-issue-entry ()
   "Ediff the current Org-mode Jira entry against the latest version.
@@ -199,6 +223,7 @@ EPOM is an element, marker, or buffer position."
           ((issue-level (org-current-level))
            (id   (org-entry-get nil "issue-id"))
            (key  (org-entry-get nil "issue-key"))
+           (template-key (org-entry-get nil "TEMPLATE_KEYS"))
            (buf-current
             (get-buffer-create (format "*jira-%s-current*" id)))
            (buf-latest
@@ -211,7 +236,21 @@ EPOM is an element, marker, or buffer position."
               (save-excursion
                 (widen)
                 (org-narrow-to-subtree)
-                (buffer-substring-no-properties (point-min) (point-max))))))
+                (buffer-substring-no-properties (point-min) (point-max)))))
+           (latest-issue-content
+            (if template-key
+                (progn
+                  (message "Generating latest version using template '%s'..."
+                           template-key)
+                  (jirassic--expand-template-for-diff issue-latest template-key))
+              ;; Fallback: Use the original serializer if no key found
+              (progn
+                (message "No template key found, using default serializer...")
+                (with-temp-buffer
+                  (save-match-data
+                    (org-mode) ; Ensure org context for serializer if needed
+                    (jirassic--serialize-issue-entry issue-latest issue-level)
+                    (buffer-string)))))))
 
         (setq jirassic--issue-location-for-diff (point-marker))
         (with-current-buffer buf-latest
@@ -220,7 +259,7 @@ EPOM is an element, marker, or buffer position."
             (org-mode)
             ;; Make sure that the issue is serialized at the same level as
             ;; the current issue.
-            (jirassic--serialize-issue-entry issue-latest issue-level)))
+            (insert latest-issue-content)))
 
         (with-current-buffer buf-current
           (let ((inhibit-read-only t))
@@ -246,7 +285,8 @@ EPOM is an element, marker, or buffer position."
        (message "Error fetching issue %s: %s"
                 (propertize key 'face 'bold)
                 (jirassic-http-error-message client-error))
-       (jirassic--issue-ediff-cleanup)))
+       (jirassic--issue-ediff-cleanup)
+       (signal (car err) (cdr err))))
 
     (error (progn
              ;; Notify the user of the error and re-raise
