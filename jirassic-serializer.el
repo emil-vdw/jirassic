@@ -62,12 +62,6 @@ heading level.")
 See `jirassic--find-min-heading-level' for more
 information.")
 
-(defvar jirassic--downloading-attachments-for-entry nil
-  "The entry for which we are downloading attachments.
-
-This stores a marker to the entry when the download starts
-so that we can return to it when the download is complete.")
-
 (defun jirassic--jira-to-org-status (jira-status)
   "Serialize a JIRA status to an org string."
   (alist-get "To Do" jirassic-org-todo-state-alist
@@ -226,46 +220,6 @@ so that we can return to it when the download is complete.")
     (insert (format-time-string "<%Y-%m-%d %a>"
                                 ;; Convert milliseconds to seconds
                                 (seconds-to-time (/ timestamp 1000))))))
-
-(defun jirassic--serialize-attachments (attachments)
-  "Serialize Jira ATTACHMENTS to org attachments."
-  (setq jirassic--downloading-attachments-for-entry
-        (point-marker))
-  (seq-map (lambda (a)
-             (let* ((attach-dir (org-attach-dir 'get-create))
-                    (filename (alist-get 'filename a))
-                    (id (alist-get 'id a))
-                    (mimetype (alist-get 'mimeType a))
-                    (filetype (alist-get mimetype
-                                         '(("image/png" . "png")
-                                           ("image/jpeg" . "jpg")
-                                           ("image/gif" . "gif")
-                                           ("application/pdf" . "pdf")
-                                           ("application/zip" . "zip"))
-                                         nil nil #'string=))
-                    (attachment-filename
-                     (if (and filetype
-                              (not (string= (f-ext filename) filetype)))
-                         (f-swap-ext filename filetype)
-                       filename))
-                    (attachment-path
-                     (expand-file-name attachment-filename
-                                       attach-dir)))
-               (jirassic-download-attachment
-                id attachment-path
-                :then
-                (cl-function
-                 (lambda (&rest args &allow-other-keys)
-                   ;; Since the user might have changed buffer while the
-                   ;; download was in progress, we need to return to the
-                   ;; org entry that we are downloading attachments for.
-                   (save-excursion
-                     (with-current-buffer (marker-buffer
-                                           jirassic--downloading-attachments-for-entry)
-                       (goto-char (marker-position
-                                   jirassic--downloading-attachments-for-entry))
-                       (org-attach-tag))))))))
-           attachments))
 
 (defun jirassic--find-min-heading-level (data)
   "Find the minimum heading level in the ADF data."

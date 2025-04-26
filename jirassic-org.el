@@ -34,7 +34,7 @@ files will be downloaded and attached to the org file via `org-attach'.")
 
 (defcustom jirassic-org-capture-templates
   `(("t" "Todo" entry
-     (file org-default-notes-file)
+     (file+olp org-default-notes-file "tasks" "foo")
      ,(concat "* %(issue-todo-state) %(issue-summary)\n"
               ":PROPERTIES:\n"
               ":issue-key: %(issue-key)\n"
@@ -51,16 +51,14 @@ files will be downloaded and attached to the org file via `org-attach'.")
 (define-error 'jirassic-capture-error
               "An error occurred while capturing a Jira issue.")
 
+;;; TODO: This belongs in client
+(defvar jirassic--max-parallel-downloads 5
+  "Maximum number of parallel downloads.")
+
 (defvar jirassic-last-inserted-issue nil
   "Most recently inserted Jira issue for use in hooks.
 
 Stores a Jirassic issue object.")
-
-(defvar jirassic-last-inserted-issue-location nil
-  "Last location of the inserted issue.
-
-This is a marker pointing to the start location of the last inserted
-issue.")
 
 (defvar jirassic--ediff-buffers-to-cleanup nil
   "List of buffers to clean up after jirassic ediff exits.")
@@ -79,28 +77,81 @@ EPOM is an element, marker, or buffer position."
    (not (null (org-entry-get epom "issue-key")))
    (not (null (org-entry-get epom "issue-id")))))
 
-(defun jirassic--maybe-download-org-attachments ()
+(defun jirassic--download-attachments (attachments attachment-dir)
+  "Download attachments to ATTACHMENT-DIR."
+  (let ((sem (aio-sem jirassic--max-parallel-downloads)))
+    (aio-wait-for
+     (jirassic-aio-all
+      (seq-map
+       (lambda (a)
+         (let* ((filename (alist-get 'filename a))
+                (id (alist-get 'id a))
+                (mimetype (alist-get 'mimeType a))
+                (filetype (alist-get mimetype
+                                     '(("image/png" . "png")
+                                       ("image/jpeg" . "jpg")
+                                       ("image/gif" . "gif")
+                                       ("application/pdf" . "pdf")
+                                       ("application/zip" . "zip"))
+                                     nil nil #'string=))
+                (attachment-filename
+                 (if (and filetype
+                          (not (string= (f-ext filename) filetype)))
+                     (f-swap-ext filename filetype)
+                   filename))
+                (attachment-path
+                 (expand-file-name attachment-filename
+                                   attachment-dir)))
+           ;; Wait until there is room in the download queue
+           (aio-with-async
+             (aio-await (aio-sem-wait sem))
+             (prog1 (aio-await (jirassic-download-attachment
+                                id attachment-path))
+               (aio-sem-post sem)))))
+       attachments)))))
+
+(aio-defun jirassic--maybe-download-org-attachments ()
   (when (and jirassic-org-add-attachments
              (jirassic-org-issue-entry-p)
              buffer-file-name)
-    (jirassic--serialize-attachments
-     (jirassic-issue-attachments jirassic-last-inserted-issue))))
+    (let ((issue-key (org-entry-get nil "issue-key"))
+          (attachment-dir (org-attach-dir 'get-create)))
+      (condition-case err
+          (jirassic-bind-restore
+              (
+               ;; TODO: Cache the issue object just fetched to avoid
+               ;; multiple requests.
+               (issue (aio-await (jirassic-get-issue issue-key)))
+               (attachment-paths
+                (aio-await (jirassic--download-attachments
+                            (jirassic-issue-attachments
+                             issue)
+                            attachment-dir))))
+            (message "Adding attachments %s..."
+                     attachment-paths)
+            (when attachment-paths
+              (org-attach-tag)))
+        (jirassic-client-error
+         (message "Error adding attachments %s: %s"
+                  (propertize issue-key 'face 'bold)
+                  (jirassic-http-error-message (cdr err))))))))
 
-(defun jirassic--org-capture-finalize ()
+(aio-defun jirassic--org-capture-finalize ()
   "Perform finalization after org capture of jira issues."
   (when (and org-capture-last-stored-marker
              (buffer-live-p (marker-buffer org-capture-last-stored-marker)))
-    (with-current-buffer (marker-buffer org-capture-last-stored-marker)
-      (goto-char (marker-position org-capture-last-stored-marker))
-      (when (jirassic-org-issue-entry-p)
-        (condition-case err
-            (jirassic--maybe-download-org-attachments)
-          (jirassic-client-error
-           (message "Error downloading attachments: %s"
-                    (jirassic-http-error-message (cdr err))))
-          (error
-           (message "Error downloading attachments: %s"
-                    (error-message-string err))))))))
+    (condition-case err
+        (aio-await
+         (with-current-buffer (marker-buffer org-capture-last-stored-marker)
+           (goto-char (marker-position org-capture-last-stored-marker))
+           (when (jirassic-org-issue-entry-p)
+             (jirassic--maybe-download-org-attachments))))
+      (jirassic-client-error
+       (message "Error downloading attachments: %s"
+                (jirassic-http-error-message (cdr err))))
+      (error
+       (message "Error downloading attachments: %s"
+                (error-message-string err))))))
 
 (defun jirassic--issue-ediff-cleanup ()
   "Cleanup buffers created by jirassic ediff."
@@ -125,7 +176,7 @@ EPOM is an element, marker, or buffer position."
         (let ((updated-issue
                (with-current-buffer ediff-buffer-C
                  (buffer-substring-no-properties (point-min) (point-max)))))
-          ;; XXX: What if the buffer has been closed?
+          ;; TODO: What if the buffer has been closed?
           (with-current-buffer (marker-buffer jirassic--issue-location-for-diff)
             (save-restriction
               (save-excursion
@@ -187,7 +238,7 @@ Returns the expanded template content as a string."
                                   ;; Handle function/file templates if necessary (more complex)
                                   (error "Only string templates supported for diff currently"))))
           (insert (org-capture-fill-template template-string))
-          ;; XXX: Align all headings with source buffer heading levels
+          ;; TODO: Align all headings with source buffer heading levels
           (buffer-string))))))
 
 ;;;###autoload

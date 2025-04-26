@@ -52,5 +52,11 @@ restored, and BODY is executed within that context."
         (match-string 1 link)
       (error "Invalid Jira issue link"))))
 
+(aio-defun jirassic-aio-all (promises)
+  "Return a promise that resolves when all PROMISES are resolved."
+  (let (results)
+    (dolist (promise promises results)
+      (push (aio-await promise) results))))
+
 (provide 'jirassic-core)
 ;;; jirassic-core.el ends here

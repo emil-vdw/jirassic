@@ -174,31 +174,47 @@ an alist of query parameters to include in the request."
 
     promise))
 
+(defun jirassic--download-file (segments to)
+  "Download a file from the Jira API with SEGMENTS to a local file TO."
+  (let* ((segments (or (and (listp segments)
+                            segments)
+                       (list segments)))
+         (resource (s-join "/" segments))
+         (url (s-concat (s-chop-suffix "/" (jirassic--base-url)) "/" resource))
+         (credentials (jirassic--credentials))
+         (headers (jirassic--http-headers credentials))
+         (promise (aio-promise)))
+
+    (request url
+      :encoding 'binary
+      :parser (lambda ()
+                (let ((buffer-file-coding-system 'binary))
+                  (write-region (point-min) (point-max) to nil 'silent)))
+      :headers headers
+      :success (cl-function (lambda (&key data &allow-other-keys)
+                              (aio-resolve promise
+                                           (lambda ()
+                                             to))))
+      :error
+      (cl-function (lambda (&key data error-thrown symbol-status response &allow-other-keys)
+                     (aio-resolve promise
+                                  (lambda ()
+                                    (signal
+                                     'jirassic-client-error
+                                     (jirassic--parse-http-error
+                                      error-thrown
+                                      response)))))))))
+
 (aio-defun jirassic-get-issue (key)
   "Get a Jira issue by KEY."
   (jirassic--parse-issue (aio-await (jirassic--get (list "issue" key)))))
 
-(cl-defun jirassic-download-attachment (id to &key then else)
-  "Download a Jira attachment by ID to a local file TO."
+(aio-defun jirassic-download-attachment (id to)
+  "Download attachment by ID to file TO and return the file path."
   (if (and (file-exists-p to)
            (not jirassic-overwrite-attachments))
       (message "Jira attachment %s exists, skipping" to)
-    (let* ((resource (s-join "/" (list "attachment" "content" id)))
-           (url (s-concat (s-chop-suffix "/" (jirassic--base-url)) "/" resource))
-           (credentials (jirassic--credentials))
-           (headers (jirassic--http-headers credentials)))
-
-      (request url
-        :encoding 'binary
-        :parser #'buffer-string
-        :headers headers
-        :success (cl-function (lambda (&key data &allow-other-keys)
-                                (with-temp-file to
-                                  (insert data))
-                                (funcall then to)))
-        :error
-        (jirassic--error-callback (or else
-                                      #'jirassic--default-error-handler))))))
+    (aio-await (jirassic--download-file (list "attachment" "content" id) to))))
 
 (provide 'jirassic-client)
 ;;; jirassic-client.el ends here
