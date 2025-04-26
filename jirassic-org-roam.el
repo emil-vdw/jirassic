@@ -29,15 +29,7 @@
      :target
      (file+head "%(issue-key)-%(issue-summary-slug).org"
                 ,(concat
-                  ":PROPERTIES:\n"
-                  ":issue-key: %(issue-key)\n"
-                  ":issue-link: %(issue-link)\n"
-                  ":issue-id: %(issue-id)\n"
-                  ":issue-type: %(issue-type)\n"
-                  ":issue-creator: %(issue-creator-name)\n"
-                  ":issue-project: %(issue-project)\n"
-                  ":ROAM_ALIASES: %(issue-key)\n"
-                  ":END:\n"
+                  "%(issue-org-properties)"
                   "#+title: %(issue-summary)\n"
                   "#+category: %(issue-summary)\n\n"
                   "%(issue-description)"))
