@@ -62,6 +62,10 @@ heading level.")
 See `jirassic--find-min-heading-level' for more
 information.")
 
+(defun jirassic--string-repeat (num s)
+  "Repeat string S NUM times."
+  (apply #'concat (make-list num s)))
+
 (defun jirassic--serialize-org-properties (props)
   "Serialize org PROPS alist to a string."
   (concat
@@ -89,25 +93,24 @@ information.")
                                       "[X]"
                                       (alist-get 'text data))))
          (marks (alist-get 'marks data)))
-    (insert
-     (seq-reduce (lambda (formatted-text mark)
-                   (let ((type (alist-get 'type mark))
-                         (attrs (alist-get 'attrs mark)))
-                     (cond
-                      ((string= type "strong")
-                       (format "*%s*" formatted-text))
-                      ((string= type "em")
-                       (format "/%s/" formatted-text))
-                      ((string= type "underline")
-                       (format "_%s_" formatted-text))
-                      ((string= type "strike")
-                       (format "+%s+" formatted-text))
-                      ((string= type "code")
-                       (format "~%s~" formatted-text))
-                      ((string= type "link")
-                       (format "[[%s][%s]]" (alist-get 'href attrs) text)))))
+    (seq-reduce (lambda (formatted-text mark)
+                  (let ((type (alist-get 'type mark))
+                        (attrs (alist-get 'attrs mark)))
+                    (cond
+                     ((string= type "strong")
+                      (format "*%s*" formatted-text))
+                     ((string= type "em")
+                      (format "/%s/" formatted-text))
+                     ((string= type "underline")
+                      (format "_%s_" formatted-text))
+                     ((string= type "strike")
+                      (format "+%s+" formatted-text))
+                     ((string= type "code")
+                      (format "~%s~" formatted-text))
+                     ((string= type "link")
+                      (format "[[%s][%s]]" (alist-get 'href attrs) text)))))
 
-                 marks text))))
+                marks text)))
 
 (defun jirassic--serialize-heading (data)
   (let* ((attrs (alist-get 'attrs data))
@@ -115,111 +118,124 @@ information.")
                       (alist-get 'level attrs))
                    jirassic--normalized-heading-offset))
          (content (alist-get 'content data)))
-    (org-insert-heading nil nil level)
-    (mapc #'jirassic--serialize-doc-node content)
-    (newline)))
+    (concat
+     ;; Insert a newline before every heading
+     "\n"
+     (jirassic--string-repeat level "*")
+     " "
+     (mapconcat #'jirassic--serialize-doc-node content)
+     "\n")))
 
 (defun jirassic--serialize-rule (data)
-  (insert "-----")
-  (newline))
+  "Serialize ADF rule objects to org strings."
+  "-----\n")
 
 (defun jirassic--serialize-emoji (data)
-  (insert (alist-get 'text (alist-get 'attrs data))))
+  (alist-get 'text (alist-get 'attrs data)))
 
 (defun jirassic--serialize-mention (data)
-  (insert (format "=%s=" (alist-get 'text (alist-get 'attrs data)))))
+  (format "=%s=" (alist-get 'text (alist-get 'attrs data))))
 
 (defun jirassic--serialize-inline-card (data)
-  (insert (format "[[%s]]" (alist-get 'url (alist-get 'attrs data)))))
+  (format "[[%s]]" (alist-get 'url (alist-get 'attrs data))))
 
 (defun jirassic--serialize-expand (data)
   (let ((title (alist-get 'title (alist-get 'attrs data))))
-    (unless (or (null title)
-                (string-empty-p title))
-      (insert (format "*%s*\n" title)))
-    (insert ":EXPAND:\n")
-    (jirassic--serialize-doc-node-content data)
-    ;; Include an extra newline after the content
-    ;; to improve readability.
-    (insert ":END:\n\n")))
+    (concat
+     "#+begin_expand"
+     (when (and title
+                (not (string= title "")))
+       (format " *%s*" title))
+     "\n"
+     (jirassic--serialize-doc-node-content data)
+     "#+end_expand\n\n")))
 
 (defun jirassic--serialize-blockquote (data)
-  (insert "#+BEGIN_QUOTE")
-  (newline)
-  (jirassic--serialize-doc-node-content data)
-  (newline)
-  (insert "#+END_QUOTE")
-  (newline))
+  (concat
+   "#+BEGIN_QUOTE\n"
+   (jirassic--serialize-doc-node-content data)
+   "\n"
+   "#+END_QUOTE\n"))
 
 (defun jirassic--serialize-codeblock (data)
   (let* ((attrs (alist-get 'attrs data))
          (language (alist-get 'language attrs))
          (content (alist-get 'content data)))
-    (insert "#+BEGIN_SRC"
-            (when language
-              (concat " " language)))
-    (newline)
-    (jirassic--serialize-doc-node-content data)
-    (newline)
-    (insert "#+END_SRC")
-    (newline)))
+    (concat
+     "#+BEGIN_SRC"
+     (when language
+       (concat " " language))
+     "\n"
+     (jirassic--serialize-doc-node-content data)
+     "\n"
+     "#+END_SRC\n")))
 
 (defun jirassic--serialize-bullet-list (data)
   (setq jirassic--list-depth (1+ jirassic--list-depth))
-  (when (> jirassic--list-depth 1)
-    ;; Insert a newline before serializing nested lists
-    (newline))
-  (let ((list-items (alist-get 'content data)))
-    (seq-map-indexed (lambda (list-item index)
-                       (insert
-                        (s-repeat (* (1- jirassic--list-depth)
-                                     (+ 2 org-list-indent-offset))
-                                  " ")
-                        (format "%s " jirassic-list-item-bullet))
-                       (jirassic--serialize-doc-node list-item)
-                       (when (< index (1- (length list-items)))
-                         (newline)))
-                     list-items))
-  (setq jirassic--list-depth (1- jirassic--list-depth))
-  (when (= jirassic--list-depth 0)
-    (newline)))
+  (prog1
+      (concat
+       (when (> jirassic--list-depth 1)
+         ;; Insert a newline before serializing nested lists
+         "\n")
+       (let ((list-items (alist-get 'content data)))
+         (apply
+          #'concat
+          (seq-map-indexed
+           (lambda (list-item index)
+             (concat
+              (jirassic--string-repeat (* (1- jirassic--list-depth)
+                                          (+ 2 org-list-indent-offset))
+                                       " ")
+              (format "%s " jirassic-list-item-bullet)
+              (jirassic--serialize-doc-node list-item)
+              (when (< index (1- (length list-items)))
+                "\n")))
+           list-items)))
+       (when (= jirassic--list-depth 1)
+         "\n"))
+    (setq jirassic--list-depth (1- jirassic--list-depth))))
 
 (defun jirassic--serialize-ordered-list (data)
   "Serialize jira ADF ordered lists to org ordered lists.
 "
   (setq jirassic--list-depth (1+ jirassic--list-depth))
-  (when (> jirassic--list-depth 1)
-    ;; Insert a newline before serializing nested lists
-    (newline))
-  (let ((list-items (alist-get 'content data)))
-
-    (seq-map-indexed (lambda (list-item index)
-                    (insert
-                     (s-repeat (* (1- jirassic--list-depth)
-                                  (+ 2 org-list-indent-offset))
-                               " ")
-                     (format "%s. " (1+ index)))
-                    (jirassic--serialize-doc-node list-item)
-                    (when (< index (1- (length list-items)))
-                      ;; Insert a newline after each list item except
-                      ;; the last
-                      (newline)))
-                  list-items))
-
-  (setq jirassic--list-depth (1- jirassic--list-depth))
-  (when (= jirassic--list-depth 0)
-    (newline)))
+  (prog1
+      (concat
+       (when (> jirassic--list-depth 1)
+         ;; Insert a newline before serializing nested lists
+         "\n")
+       (let ((list-items (alist-get 'content data)))
+         (seq-map-indexed
+          (lambda (list-item index)
+            (concat
+             (jirassic--string-repeat
+              (* (1- jirassic--list-depth)
+                 (+ 2 org-list-indent-offset))
+              " ")
+             (format "%s. " (1+ index))
+             (jirassic--serialize-doc-node list-item)
+             (when (< index (1- (length list-items)))
+               ;; Insert a newline after each list item except
+               ;; the last
+               "\n")))
+          list-items))
+       (when (= jirassic--list-depth 1)
+         "\n"))
+   (setq jirassic--list-depth (1- jirassic--list-depth))))
 
 (defun jirassic--serialize-doc-node-content (data)
   (let ((content (alist-get 'content data)))
-    (seq-map-indexed (lambda (node index)
-                       (jirassic--serialize-doc-node node))
-                     content)))
+    (apply
+     #'concat
+     (seq-map-indexed (lambda (node index)
+                        (jirassic--serialize-doc-node node))
+                      content))))
 
 (defun jirassic--serialize-paragraph (data)
-  (jirassic--serialize-doc-node-content data)
-  (when (= jirassic--list-depth 0)
-    (newline)))
+  (concat
+   (jirassic--serialize-doc-node-content data)
+   (when (= jirassic--list-depth 0)
+     "\n")))
 
 (defun jirassic--serialize-list-item (data)
   (jirassic--serialize-doc-node-content data))
@@ -228,9 +244,9 @@ information.")
   (let ((timestamp
          (string-to-number
           (alist-get 'timestamp (alist-get 'attrs data)))))
-    (insert (format-time-string "<%Y-%m-%d %a>"
-                                ;; Convert milliseconds to seconds
-                                (seconds-to-time (/ timestamp 1000))))))
+    (format-time-string "<%Y-%m-%d %a>"
+                        ;; Convert milliseconds to seconds
+                        (seconds-to-time (/ timestamp 1000)))))
 
 (defun jirassic--find-min-heading-level (data)
   "Find the minimum heading level in the ADF data."
@@ -270,15 +286,7 @@ information.")
   (jirassic--serialize-doc-node doc))
 
 (defun jirassic--doc-string (doc &optional level)
-  (with-temp-buffer
-    ;; Activating `org-mode' alters match data so
-    ;; we need to save it before calling `org-mode'.
-    (save-match-data
-      (org-mode)
-      (jirassic--serialize-doc doc level)
-      (buffer-substring-no-properties
-       (point-min)
-       (point-max)))))
+  (jirassic--serialize-doc doc level))
 
 (defun jirassic--serialize-doc-node (node)
   "Serialize ADF objects to org strings."
@@ -295,7 +303,7 @@ information.")
      ((string= type "listItem")
       (jirassic--serialize-list-item node))
      ((string= type "hardBreak")
-      (newline))
+      "\n")
      ((string= type "paragraph")
       (jirassic--serialize-paragraph node))
      ((string= type "doc")
@@ -321,19 +329,15 @@ information.")
 
 (defun jirassic--serialize-properties (issue &optional extra-properties)
   "Set org entry properties for the given ISSUE."
-  (insert ":PROPERTIES:\n")
-  (mapc (lambda (property)
-          (insert (format ":%s: %s\n"
-                          (car property) (cadr property))))
-        (append extra-properties
-                `(("issue-key" ,(jirassic-issue-key issue))
-                  ("issue-link" ,(jirassic-issue-link issue))
-                  ("issue-id" ,(jirassic-issue-id issue))
-                  ("issue-type" ,(jirassic-issue-type issue))
-                  ("issue-creator" ,(jirassic-user-display-name
-                                     (jirassic-issue-creator issue)))
-                  ("issue-project" ,(jirassic-issue-project issue)))))
-  (insert ":END:\n"))
+  (jirassic--serialize-org-properties
+   (append extra-properties
+           `(("issue-key"     . ,(jirassic-issue-key issue))
+             ("issue-link"    . ,(jirassic-issue-link issue))
+             ("issue-id"      . ,(jirassic-issue-id issue))
+             ("issue-type"    . ,(jirassic-issue-type issue))
+             ("issue-creator" . ,(jirassic-user-display-name
+                                  (jirassic-issue-creator issue)))
+             ("issue-project" . ,(jirassic-issue-project issue))))))
 
 (defun jirassic--serialize-issue-entry (issue &optional level)
   "Serialize a JIRA issue to an org entry.
@@ -341,22 +345,13 @@ information.")
 This function will insert the issue into the current buffer with
 the same behavior as `org-insert-heading'. After inserting the
 issue, it will return a marker to the start of the entry."
-  (let ((level (or level 1))
-        entry-start)
-    (org-insert-heading nil nil level)
-    (save-excursion
-      (beginning-of-line)
-      (setq entry-start (point-marker)))
-    (insert (jirassic--jira-to-org-status (jirassic-issue-status issue))
-            " "
-            (jirassic-issue-summary issue))
-    (newline)
-    (jirassic--serialize-properties issue)
-    (newline)
-    (jirassic--serialize-doc (jirassic-issue-description issue) (+ level 1))
-
-    ;; Return a marker to the start of the entry
-    entry-start))
+  (let ((level (or level 1)))
+    (concat
+     (jirassic--string-repeat level "*") " "
+     (jirassic--jira-to-org-status (jirassic-issue-status issue)) " "
+     (jirassic-issue-summary issue) "\n"
+     (jirassic--serialize-properties issue)
+     (jirassic--serialize-doc (jirassic-issue-description issue) (+ level 1)))))
 
 
 (provide 'jirassic-serializer)
