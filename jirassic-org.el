@@ -77,6 +77,26 @@ EPOM is an element, marker, or buffer position."
    (not (null (org-entry-get epom "issue-key")))
    (not (null (org-entry-get epom "issue-id")))))
 
+(defun jirassic--min-heading-level-in-buffer ()
+  "Find the minimum heading level in the current buffer.
+
+Returns the minimum level found, or nil if no headings exist."
+  (unless (derived-mode-p 'org-mode)
+    (error "Not in org-mode buffer"))
+  (save-excursion
+    (goto-char (point-min))
+    (let (min-level)
+      (org-map-entries
+       (lambda ()
+         (if-let ((current-level (org-current-level)))
+             (setq min-level
+                   (cond
+                    ((null min-level) current-level)
+                    (t (min min-level
+                            current-level))))))
+       t nil)
+      min-level)))
+
 (defun jirassic--download-attachments (attachments attachment-dir)
   "Download attachments to ATTACHMENT-DIR."
   (let ((sem (aio-sem jirassic--max-parallel-downloads)))
@@ -188,7 +208,7 @@ EPOM is an element, marker, or buffer position."
                   (insert updated-issue)))))))
     (jirassic--issue-ediff-cleanup)))
 
-(defun jirassic--expand-template-for-diff (issue template-keys)
+(defun jirassic--expand-template-for-diff (issue template-keys level)
   "Expand the specified Jira issue template for diffing.
 
 ISSUE is the `jirassic-issue' struct with the latest data.
@@ -208,8 +228,29 @@ Returns the expanded template content as a string."
                                     template-definition
                                   ;; Handle function/file templates if necessary (more complex)
                                   (error "Only string templates supported for diff currently"))))
+          (org-mode)
           (insert (org-capture-fill-template template-string))
-          ;; TODO: Align all headings with source buffer heading levels
+          ;; We are expanding the template but we want to have the
+          ;; lowest level heading in the buffer to be at `level'.
+          (if-let ((min-level (jirassic--min-heading-level-in-buffer))
+                   (diff (- level
+                                    min-level)))
+              (dotimes (_ diff)
+                (org-map-entries
+                 (if (> diff 0)
+                     #'org-demote-subtree
+                   #'org-promote-subtree)
+                 t nil)))
+          ;; There might be an `:ATTACH:' tag in the template
+          (unless (or (seq-empty-p (jirassic-issue-attachments issue))
+                      (null jirassic-org-add-attachments))
+            (point-min)
+            (org-map-entries
+             (lambda ()
+               (when (string= (org-entry-get nil "issue-key")
+                              (jirassic-issue-key issue))
+                 (org-attach-tag)))
+             t nil))
           (buffer-string))))))
 
 ;;;###autoload
@@ -266,15 +307,13 @@ Returns the expanded template content as a string."
                 (progn
                   (message "Generating latest version using template '%s'..."
                            template-key)
-                  (jirassic--expand-template-for-diff issue-latest template-key))
+                  (jirassic--expand-template-for-diff issue-latest
+                                                      template-key
+                                                      issue-level))
               ;; Fallback: Use the original serializer if no key found
               (progn
                 (message "No template key found, using default serializer...")
-                (with-temp-buffer
-                  (save-match-data
-                    (org-mode) ; Ensure org context for serializer if needed
-                    (jirassic--serialize-issue-entry issue-latest issue-level)
-                    (buffer-string)))))))
+                (jirassic--serialize-issue-entry issue-latest issue-level)))))
 
         (setq jirassic--issue-location-for-diff (point-marker))
         (with-current-buffer buf-latest
@@ -289,8 +328,6 @@ Returns the expanded template content as a string."
           (let ((inhibit-read-only t))
             (erase-buffer)
             (org-mode)
-            ;; Make sure that the issue is serialized at the same level as
-            ;; the current issue.
             (insert current-issue-content)))
 
         (push buf-current jirassic--ediff-buffers-to-cleanup)
