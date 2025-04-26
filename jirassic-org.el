@@ -298,10 +298,22 @@ EPOM is an element, marker, or buffer position."
 (aio-defun jirassic-org-capture (issue-key &optional goto keys)
   "Capture a Jira issue using Org capture templates."
   (interactive "sIssue key: ")
-  (let* ((issue (aio-await (jirassic-get-issue issue-key)))
-         (org-capture-templates jirassic-org-capture-templates))
-    (jirassic--with-issue-context-funcs issue
-      (org-capture goto keys))))
+  (condition-case err
+      (let* ((issue (aio-await (jirassic-get-issue issue-key)))
+             (org-capture-templates jirassic-org-capture-templates))
+        (jirassic--with-issue-context-funcs issue
+          (org-capture goto keys)))
+
+    (jirassic-client-error
+     (message "Error fetching issue '%s': %s"
+              issue-key
+              (jirassic-http-error-message (cdr err)))
+     (signal (car err) (cdr err)))
+    (error
+     (message "Error capturing issue %s: %s"
+              issue-key
+              (error-message-string err))
+     (signal (car err) (cdr err)))))
 
 (add-hook 'jirassic-org-after-insert-hook #'jirassic--maybe-download-org-attachments)
 (add-hook 'org-capture-after-finalize-hook #'jirassic--org-capture-finalize)

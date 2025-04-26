@@ -108,11 +108,13 @@ variables, see the `jirassic-roam-capture-templates' variable."
     (jirassic-client-error
      (message "Error fetching issue '%s': %s"
               issue-key
-              (jirassic-http-error-message (cdr err))))
+              (jirassic-http-error-message (cdr err)))
+     (signal (car err) (cdr err)))
     (error
      (message "Error capturing issue %s: %s"
               issue-key
-              (error-message-string err)))))
+              (error-message-string err))
+     (signal (car err) (cdr err)))))
 
 (provide 'jirassic-org-roam)
 ;;; jirassic-org-roam.el ends here
