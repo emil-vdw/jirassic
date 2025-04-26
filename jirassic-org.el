@@ -22,11 +22,6 @@
 If nil, the media files will be linked to the issue. If t, the media
 files will be downloaded and attached to the org file via `org-attach'.")
 
-(defcustom jirassic-org-after-insert-hook nil
-  "Hook run after inserting a Jira issue into an Org buffer."
-  :type 'hook
-  :group 'jirassic)
-
 (defcustom jirassic-restore-windows-after-diff t
   "Whether to restore windows after viewing issue changes."
   :type 'boolean
@@ -141,8 +136,6 @@ Returns the minimum level found, or nil if no headings exist."
                             (jirassic-issue-attachments
                              issue)
                             attachment-dir))))
-            (message "Adding attachments %s..."
-                     attachment-paths)
             (when attachment-paths
               (org-attach-tag)))
         (jirassic-client-error
@@ -152,7 +145,8 @@ Returns the minimum level found, or nil if no headings exist."
 
 (aio-defun jirassic--org-capture-finalize ()
   "Perform finalization after org capture of jira issues."
-  (when (and org-capture-last-stored-marker
+  (when (and (not org-note-abort)
+             org-capture-last-stored-marker
              (buffer-live-p (marker-buffer org-capture-last-stored-marker)))
     (condition-case err
         (aio-await
@@ -349,9 +343,9 @@ Returns the expanded template content as a string."
              (jirassic--issue-ediff-cleanup)
              (signal (car err) (cdr err))))))
 
-(defmacro jirassic--with-issue-context-funcs (issue keys &rest body)
+(defmacro jirassic--with-issue-context-funcs (issue &rest body)
   "Dynamically bind functions for ISSUE properties and execute body."
-  (declare (indent 2))
+  (declare (indent 1))
   (let ((bindings
          `((issue-key            . (jirassic-issue-key issue))
            (issue-id             . (jirassic-issue-id issue))
@@ -381,7 +375,7 @@ Returns the expanded template content as a string."
            (issue-org-properties
             . (jirassic--serialize-properties
                issue
-               '(("TEMPLATE-KEYS" . ,keys)))))))
+               '(("TEMPLATE-KEYS" . ,(org-capture-get :key))))))))
     `(cl-letf ,(mapcar (lambda (binding)
                          (let ((symbol (car binding))
                                (value (cdr binding)))
@@ -400,21 +394,8 @@ Returns the expanded template content as a string."
   (condition-case err
       (let* ((issue (aio-await (jirassic-get-issue issue-key)))
              (org-capture-templates jirassic-org-capture-templates))
-        (if keys
-            (jirassic--with-issue-context-funcs issue keys
-              (org-capture goto keys))
-          ;; If no keys are provided, we have to prompt for template
-          ;; selection so we can pass the issue context to the template.
-          ;; We need to know the key because we have to include it in the
-          ;; template context (and eventually in the org entry properties)
-          ;; because the `jirassic-update-org-issue-entry' functionality
-          ;; will need it.
-          (let* ((org-capture-entry (org-capture-select-template keys))
-                 (keys (if (listp org-capture-entry)
-                           (car org-capture-entry)
-                         org-capture-entry)))
-            (jirassic--with-issue-context-funcs issue keys
-              (org-capture goto keys)))))
+        (jirassic--with-issue-context-funcs issue
+            (org-capture goto keys)))
 
     (jirassic-client-error
      (message "Error fetching issue '%s': %s"
@@ -427,7 +408,6 @@ Returns the expanded template content as a string."
               (error-message-string err))
      (signal (car err) (cdr err)))))
 
-(add-hook 'jirassic-org-after-insert-hook #'jirassic--maybe-download-org-attachments)
 (add-hook 'org-capture-after-finalize-hook #'jirassic--org-capture-finalize)
 
 (provide 'jirassic-org)
