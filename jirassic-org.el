@@ -75,7 +75,9 @@ issue.")
   "Check if org entry at EPOM is a jira issue.
 
 EPOM is an element, marker, or buffer position."
-  (not (null (org-entry-get epom "issue-id"))))
+  (and
+   (not (null (org-entry-get epom "issue-key")))
+   (not (null (org-entry-get epom "issue-id")))))
 
 (defun jirassic--maybe-download-org-attachments ()
   (when (and jirassic-org-add-attachments
