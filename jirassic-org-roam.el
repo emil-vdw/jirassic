@@ -81,7 +81,7 @@ variables, see the `jirassic-roam-capture-templates' variable."
                           issue-key))
              (issue (aio-await (jirassic-get-issue issue-key)))
              (issue-description
-              (jirassic--doc-string (jirassic-issue-description issue)))
+              (jirassic--doc-string (jirassic-issue-description issue) 1))
              (issue-info
               (list :issue-key issue-key
                     :issue-id (jirassic-issue-id issue)

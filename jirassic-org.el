@@ -34,16 +34,16 @@ files will be downloaded and attached to the org file via `org-attach'.")
 
 (defcustom jirassic-org-capture-templates
   `(("t" "Todo" entry
-     (file+headline org-default-notes-file "Tasks")
-     ,(concat "* %{issue-status} %{issue-summary}\n"
+     (file org-default-notes-file)
+     ,(concat "* %(issue-todo-state) %(issue-summary)\n"
               ":PROPERTIES:\n"
-              ":issue-key: %{issue-key}\n"
-              ":issue-link: %{issue-link}\n"
-              ":issue-id: %{issue-id}\n"
-              ":issue-type: %{issue-type}\n"
-              ":issue-creator: %{issue-creator-name}\n"
-              ":issue-project: %{issue-project}\n"
-              ":END:\n\n%{issue-description}")))
+              ":issue-key: %(issue-key)\n"
+              ":issue-link: %(issue-link)\n"
+              ":issue-id: %(issue-id)\n"
+              ":issue-type: %(issue-type)\n"
+              ":issue-creator: %(issue-creator-name)\n"
+              ":issue-project: %(issue-project)\n"
+              ":END:\n\n%(issue-description)")))
   "Org capture templates for Jira issues."
   :type (get 'org-capture-templates 'custom-type)
   :group 'jirassic)
@@ -254,101 +254,54 @@ EPOM is an element, marker, or buffer position."
              (jirassic--issue-ediff-cleanup)
              (signal (car err) (cdr err))))))
 
-(defun jirassic--create-template-subst-alist (issue)
-  "Create alist for template substitution from Jira ISSUE.
-
-Keys are literal strings like \"${issue-key}\", values are fetched data."
-  `(("%{issue-key}"           . ,(jirassic-issue-key issue))
-    ("%{issue-id}"            . ,(jirassic-issue-id issue))
-    ("%{issue-summary}"       . ,(jirassic-issue-summary issue))
-    ;; Use jirassic--doc-string to get Org-formatted description
-    ("%{issue-description}"   . ,(jirassic--doc-string (jirassic-issue-description issue)))
-    ("%{issue-type}"          . ,(jirassic-issue-type issue))
-    ("%{issue-priority}"      . ,(jirassic-issue-priority issue))
-    ("%{issue-status}"        . ,(jirassic-issue-status issue))
-    ;; Use jirassic--jira-to-org-status for Org TODO state mapping
-    ("%{issue-todo-state}"    . ,(jirassic--jira-to-org-status (jirassic-issue-status issue)))
-    ("%{issue-creator-name}"  . ,(jirassic-user-display-name (jirassic-issue-creator issue)))
-    ("%{issue-creator-email}" . ,(jirassic-user-email-address (jirassic-issue-creator issue)))
-    ("%{issue-project}"       . ,(jirassic-issue-project issue))
-    ("%{issue-link}"          . ,(jirassic-issue-link issue))
-    ;; Add a slug version useful for filenames
-    ("%{issue-summary-slug}" . ,(replace-regexp-in-string
-                                 "[^a-zA-Z0-9_]+" "_"
-                                 (downcase (jirassic-issue-summary issue))))))
-
-(defun jirassic--substitute-template-placeholders (text subst-alist)
-  "Substitute placeholders (e.g., \"${issue-key}\") in TEXT using SUBST-ALIST.
-
-Returns the processed text, or original text if input is nil or not a string."
-  (if (stringp text)
-      (let ((processed-text text))
-        (dolist (pair subst-alist processed-text)
-          (let ((placeholder (car pair))
-                (value (cdr pair)))
-            ;; Replace placeholder with (quoted) value. Replace nil with empty string.
-            (setq processed-text
-                  (replace-regexp-in-string (regexp-quote placeholder) ; Match literal placeholder
-                                            (or value "") ; Insert literal value (or "")
-                                            processed-text
-                                            t ; FIXEDCASE (match case)
-                                            t ; LITERAL (replacement is literal)
-                                            )))))
-    text))
-
-(defun jirassic--process-capture-template (entry issue)
-  "Process ENTRY, substituting Jira ISSUE attributes.
-
-Substitutes in target (string or file+headline) and template string.
-Returns the processed template definition list."
-  (cl-destructuring-bind (key description type target template &rest properties)
-      entry
-    (let* ((subst-alist (jirassic--create-template-subst-alist issue))
-           (template (pcase template
-                       ((and (pred stringp) template) template)
-                       (`(file ,file)
-                        (let ((filename (expand-file-name file org-directory)))
-                          (if (file-exists-p filename) (org-file-contents filename)
-                            (signal 'jirassic-capture-error
-                                    (format "Template file %s does not exist" filename)))))
-                       (`(function ,f)
-                        (if (functionp f) (funcall f)
-                          (signal 'jirassic-capture-error
-                                  "Invalid template function")))
-                       (_ (signal 'jirassic-capture-error
-                                  "Invalid template format"))))
-           (template (jirassic--substitute-template-placeholders template subst-alist)))
-      `(,key ,description ,type ,target ,template ,@properties))))
+(defmacro jirassic--with-issue-context-funcs (issue &rest body)
+  "Dynamically bind functions for ISSUE properties and execute body."
+  (declare (indent 1))
+  (let ((bindings
+         `((issue-key           . (jirassic-issue-key issue))
+           (issue-id            . (jirassic-issue-id issue))
+           (issue-summary       . (jirassic-issue-summary issue))
+           (issue-description   . (lambda (&optional level)
+                                    (jirassic--doc-string
+                                     (jirassic-issue-description issue)
+                                     ;; In templates, the heading will
+                                     ;; normally be at level 1 so the
+                                     ;; description defaults to start
+                                     ;; at level 2.
+                                     (or level 2))))
+           (issue-type          . (jirassic-issue-type issue))
+           (issue-priority      . (jirassic-issue-priority issue))
+           (issue-status        . (jirassic-issue-status issue))
+           (issue-todo-state    . (jirassic--jira-to-org-status
+                                   (jirassic-issue-status issue)))
+           (issue-creator-name  . (jirassic-user-display-name
+                                   (jirassic-issue-creator issue)))
+           (issue-creator-email . (jirassic-user-email-address
+                                   (jirassic-issue-creator issue)))
+           (issue-project       . (jirassic-issue-project issue))
+           (issue-link          . (jirassic-issue-link issue))
+           (issue-summary-slug  . (replace-regexp-in-string
+                                   "[^a-zA-Z0-9_]+" "_"
+                                   (downcase (jirassic-issue-summary issue)))))))
+    `(cl-letf ,(mapcar (lambda (binding)
+                         (let ((symbol (car binding))
+                               (value (cdr binding)))
+                           `((symbol-function ',symbol)
+                             (lambda (&rest args)
+                               (if (functionp ,value)
+                                   (apply ,value args)
+                                 ,value)))))
+                       bindings)
+       ,@body)))
 
 ;;;###autoload
 (aio-defun jirassic-org-capture (issue-key &optional goto keys)
   "Capture a Jira issue using Org capture templates."
   (interactive "sIssue key: ")
   (let* ((issue (aio-await (jirassic-get-issue issue-key)))
-         (org-capture-templates jirassic-org-capture-templates)
-         (entry (org-capture-select-template keys)))
-    (condition-case err
-        (progn
-          (unless (listp entry)
-            (signal 'jirassic-capture-error
-                    "Special form handled by org-capture"))
-          (let (
-                ;; This is the var that `org-capture' will use instead of
-                ;; prompting the user again.
-                (org-capture-entry (jirassic--process-capture-template entry issue)))
-            (org-capture goto keys)))
-
-      ;; On any error, let `org-capture' handle the error.
-      (jirassic-capture-error
-       (message "Error capturing issue %s: %s"
-                (propertize issue-key 'face 'bold)
-                (error-message-string err))
-       (org-capture goto keys))
-      (error
-       (message "Error capturing issue %s: %s"
-                (propertize issue-key 'face 'bold)
-                (error-message-string err))
-       (signal (car err) (cdr err))))))
+         (org-capture-templates jirassic-org-capture-templates))
+    (jirassic--with-issue-context-funcs issue
+      (org-capture goto keys))))
 
 (add-hook 'jirassic-org-after-insert-hook #'jirassic--maybe-download-org-attachments)
 (add-hook 'org-capture-after-finalize-hook #'jirassic--org-capture-finalize)

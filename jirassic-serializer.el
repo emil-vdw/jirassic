@@ -49,8 +49,8 @@ In Jira issue descriptions, one often uses heading 3 and greater instead
 of using 1 and 2 for visual reasons. This does not look great when
 translated to org format.
 
-This reduces all heading levels by the
-difference between the largest heading level and 1.")
+This reduces the level all heading levels by the amount of smallest
+heading level.")
 
 (defvar jirassic--list-depth -1
   "The current depth of the list. Used to indent list items.")
@@ -59,7 +59,7 @@ difference between the largest heading level and 1.")
 (defvar jirassic--normalized-heading-offset 0
   "The offset to use for normalizing heading levels.
 
-See `jirassic--determine-normalized-heading-offset' for more
+See `jirassic--find-min-heading-level' for more
 information.")
 
 (defvar jirassic--downloading-attachments-for-entry nil
@@ -267,23 +267,8 @@ so that we can return to it when the download is complete.")
                        (org-attach-tag))))))))
            attachments))
 
-(defun jirassic--determine-normalized-heading-offset (data)
-  "Find the normalized heading offset from the headings in DATA.
-
-Basically we need to determine how much to demote the headings that will
-be created from DATA so that the heading levels under the main heading
-start at the level one below the main heading.
-
-Keep in mind that the headings, when serialized, will be demoted by the
-entry's starting level, so the offset we are calculating will be relative
-to the entry's level.
-
-For example, if your DATA contains headings at levels 4 and 6, then the
-minimum is 4 and we want new headings to start at level 2, so we demote
-everything by 2. Now if we're inserting at a starting level of 3, then
-normalized heading offset of a heading with level 4 in data will be:
-'4 + 3 - 2 = 5' where 2 is the offset we are calculating.
-"
+(defun jirassic--find-min-heading-level (data)
+  "Find the minimum heading level in the ADF data."
   (let ((min-level nil))
     (cl-labels
         ((walk (n)
@@ -305,10 +290,8 @@ normalized heading offset of a heading with level 4 in data will be:
                  (seq-map #'walk content))))))
       (walk data))
 
-    (if min-level
-        (max (- min-level 1)
-             0)
-      0)))
+    (or min-level
+        0)))
 
 (defun jirassic--serialize-doc (doc &optional level)
   (setq jirassic--list-depth 0)
@@ -317,12 +300,14 @@ normalized heading offset of a heading with level 4 in data will be:
   ;; `jirassic-normalize-heading-levels' for more info.
   (setq jirassic--normalized-heading-offset
         (or (and jirassic-normalize-heading-levels
-                 (jirassic--determine-normalized-heading-offset doc))
+                 (jirassic--find-min-heading-level doc))
             0))
   (jirassic--serialize-doc-node doc))
 
 (defun jirassic--doc-string (doc &optional level)
   (with-temp-buffer
+    ;; Activating `org-mode' alters match data so
+    ;; we need to save it before calling `org-mode'.
     (save-match-data
       (org-mode)
       (jirassic--serialize-doc doc level)
@@ -403,7 +388,7 @@ issue, it will return a marker to the start of the entry."
     (newline)
     (jirassic--serialize-properties issue)
     (newline)
-    (jirassic--serialize-doc (jirassic-issue-description issue) level)
+    (jirassic--serialize-doc (jirassic-issue-description issue) (+ level 1))
 
     ;; Return a marker to the start of the entry
     entry-start))
