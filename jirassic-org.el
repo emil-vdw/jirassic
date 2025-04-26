@@ -242,8 +242,8 @@ Returns the expanded template content as a string."
           (buffer-string))))))
 
 ;;;###autoload
-(aio-defun jirassic-org-update-issue-entry ()
-  "Ediff the current Org-mode Jira entry against the latest version.
+(aio-defun jirassic-update-org-issue-entry ()
+  "Ediff the current Jira Org entry against the latest version.
 
 1. Grab `issue-id` and `issue-key` from the current Org entry properties.
 2. Copy the current subtree into buffer `*jira-<ID>-current*`.
