@@ -69,7 +69,7 @@ information.")
 (defun jirassic--serialize-org-properties (props)
   "Serialize org PROPS alist to a string."
   (concat
-   ":BEGIN:\n"
+   ":PROPERTIES:\n"
    (mapconcat
     (lambda (prop)
       (format ":%s: %s" (car prop) (cdr prop)))
