@@ -62,6 +62,17 @@ heading level.")
 See `jirassic--find-min-heading-level' for more
 information.")
 
+(defun jirassic--serialize-org-properties (props)
+  "Serialize org PROPS alist to a string."
+  (concat
+   ":BEGIN:\n"
+   (mapconcat
+    (lambda (prop)
+      (format ":%s: %s" (car prop) (cdr prop)))
+    props
+    "\n")
+   "\n:END:\n"))
+
 (defun jirassic--jira-to-org-status (jira-status)
   "Serialize a JIRA status to an org string."
   (alist-get "To Do" jirassic-org-todo-state-alist
