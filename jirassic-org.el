@@ -188,35 +188,6 @@ EPOM is an element, marker, or buffer position."
                   (insert updated-issue)))))))
     (jirassic--issue-ediff-cleanup)))
 
-;;;###autoload
-(aio-defun jirassic-org-insert-issue (key &optional level)
-  "Insert a Jira issue into the current buffer."
-  (interactive
-   (list (read-string "Enter issue key: ")
-         (if current-prefix-arg
-             (prefix-numeric-value current-prefix-arg)
-           (org-current-level))))
-
-  (unless (derived-mode-p 'org-mode)
-    (error "Cannot insert issue in non-org buffer"))
-
-  (message "Fetching issue %s..." key)
-  (condition-case err
-      (jirassic-bind-restore ((issue (aio-await (jirassic-get-issue key))))
-
-        ;; Make sure to return to the start of where we insert the issue
-        ;; before running the hooks.
-        (goto-char
-         (marker-position (jirassic--serialize-issue-entry issue level)))
-        (setq jirassic-last-inserted-issue issue)
-        (run-hooks 'jirassic-org-after-insert-hook))
-    (jirassic-client-error
-     (let ((client-error (cdr err)))
-       (message "Error fetching issue %s: %s"
-                (propertize key 'face 'bold)
-                (jirassic-http-error-message
-                 client-error))))))
-
 (defun jirassic--expand-template-for-diff (issue template-keys)
   "Expand the specified Jira issue template for diffing.
 
