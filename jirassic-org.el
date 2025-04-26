@@ -36,14 +36,8 @@ files will be downloaded and attached to the org file via `org-attach'.")
   `(("t" "Todo" entry
      (file+olp org-default-notes-file "tasks" "foo")
      ,(concat "* %(issue-todo-state) %(issue-summary)\n"
-              ":PROPERTIES:\n"
-              ":issue-key: %(issue-key)\n"
-              ":issue-link: %(issue-link)\n"
-              ":issue-id: %(issue-id)\n"
-              ":issue-type: %(issue-type)\n"
-              ":issue-creator: %(issue-creator-name)\n"
-              ":issue-project: %(issue-project)\n"
-              ":END:\n\n%(issue-description)")))
+              "%(issue-org-properties)\n"
+              "%(issue-description)")))
   "Org capture templates for Jira issues."
   :type (get 'org-capture-templates 'custom-type)
   :group 'jirassic)
@@ -355,14 +349,14 @@ Returns the expanded template content as a string."
              (jirassic--issue-ediff-cleanup)
              (signal (car err) (cdr err))))))
 
-(defmacro jirassic--with-issue-context-funcs (issue &rest body)
+(defmacro jirassic--with-issue-context-funcs (issue keys &rest body)
   "Dynamically bind functions for ISSUE properties and execute body."
-  (declare (indent 1))
+  (declare (indent 2))
   (let ((bindings
-         `((issue-key           . (jirassic-issue-key issue))
-           (issue-id            . (jirassic-issue-id issue))
-           (issue-summary       . (jirassic-issue-summary issue))
-           (issue-description   . (lambda (&optional level)
+         `((issue-key            . (jirassic-issue-key issue))
+           (issue-id             . (jirassic-issue-id issue))
+           (issue-summary        . (jirassic-issue-summary issue))
+           (issue-description    . (lambda (&optional level)
                                     (jirassic--doc-string
                                      (jirassic-issue-description issue)
                                      ;; In templates, the heading will
@@ -370,20 +364,24 @@ Returns the expanded template content as a string."
                                      ;; description defaults to start
                                      ;; at level 2.
                                      (or level 2))))
-           (issue-type          . (jirassic-issue-type issue))
-           (issue-priority      . (jirassic-issue-priority issue))
-           (issue-status        . (jirassic-issue-status issue))
-           (issue-todo-state    . (jirassic--jira-to-org-status
+           (issue-type           . (jirassic-issue-type issue))
+           (issue-priority       . (jirassic-issue-priority issue))
+           (issue-status         . (jirassic-issue-status issue))
+           (issue-todo-state     . (jirassic--jira-to-org-status
                                    (jirassic-issue-status issue)))
-           (issue-creator-name  . (jirassic-user-display-name
+           (issue-creator-name   . (jirassic-user-display-name
                                    (jirassic-issue-creator issue)))
-           (issue-creator-email . (jirassic-user-email-address
+           (issue-creator-email  . (jirassic-user-email-address
                                    (jirassic-issue-creator issue)))
-           (issue-project       . (jirassic-issue-project issue))
-           (issue-link          . (jirassic-issue-link issue))
-           (issue-summary-slug  . (replace-regexp-in-string
+           (issue-project        . (jirassic-issue-project issue))
+           (issue-link           . (jirassic-issue-link issue))
+           (issue-summary-slug   . (replace-regexp-in-string
                                    "[^a-zA-Z0-9_]+" "_"
-                                   (downcase (jirassic-issue-summary issue)))))))
+                                   (downcase (jirassic-issue-summary issue))))
+           (issue-org-properties
+            . (jirassic--serialize-properties
+               issue
+               '(("TEMPLATE-KEYS" . ,keys)))))))
     `(cl-letf ,(mapcar (lambda (binding)
                          (let ((symbol (car binding))
                                (value (cdr binding)))
@@ -402,8 +400,21 @@ Returns the expanded template content as a string."
   (condition-case err
       (let* ((issue (aio-await (jirassic-get-issue issue-key)))
              (org-capture-templates jirassic-org-capture-templates))
-        (jirassic--with-issue-context-funcs issue
-          (org-capture goto keys)))
+        (if keys
+            (jirassic--with-issue-context-funcs issue keys
+              (org-capture goto keys))
+          ;; If no keys are provided, we have to prompt for template
+          ;; selection so we can pass the issue context to the template.
+          ;; We need to know the key because we have to include it in the
+          ;; template context (and eventually in the org entry properties)
+          ;; because the `jirassic-update-org-issue-entry' functionality
+          ;; will need it.
+          (let* ((org-capture-entry (org-capture-select-template keys))
+                 (keys (if (listp org-capture-entry)
+                           (car org-capture-entry)
+                         org-capture-entry)))
+            (jirassic--with-issue-context-funcs issue keys
+              (org-capture goto keys)))))
 
     (jirassic-client-error
      (message "Error fetching issue '%s': %s"
