@@ -58,7 +58,9 @@ available in the template:
   "Org property name for Org-roam template keys.")
 
 (defun jirassic--expand-roam-template-for-diff (issue template-keys level)
-  "Expand the Org-roam template for a given issue."
+  "Expand the Org-roam template for a given ISSUE at LEVEL.
+
+TEMPLATE-KEYS is the string key (e.g., \"t\", \"i\") identifying the template."
 
   (let* ((template-defs jirassic-roam-capture-templates)
          ;; Find the template definition based on the key

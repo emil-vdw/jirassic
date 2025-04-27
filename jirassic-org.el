@@ -18,6 +18,10 @@
 (require 'jirassic-client)
 
 
+(declare-function jirassic--expand-roam-template-for-diff
+                  "jirassic-org-roam"
+                  (issue template-keys level))
+
 (defcustom jirassic-org-add-attachments t
   "Whether to download and attach files.
 
