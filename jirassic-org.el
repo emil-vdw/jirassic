@@ -58,6 +58,9 @@ Stores a Jirassic issue object.")
 (defvar jirassic--issue-location-for-diff nil
   "Marker for the location of the issue being diffed.")
 
+(defvar jirassic--template-key-property "TEMPLATE_KEYS"
+  "The org property name for the template key.")
+
 (defun jirassic-org-issue-entry-p (&optional epom)
   "Check if org entry at EPOM is a jira issue.
 
@@ -163,17 +166,20 @@ Returns the minimum level found, or nil if no headings exist."
 
 (defun jirassic--issue-ediff-cleanup ()
   "Cleanup buffers created by jirassic ediff."
-  (mapc #'kill-buffer jirassic--ediff-buffers-to-cleanup)
-  (setq jirassic--ediff-buffers-to-cleanup nil)
-  (when ediff-buffer-C
-    (kill-buffer ediff-buffer-C))
-  (when ediff-control-buffer
-    (kill-buffer ediff-control-buffer))
-  (when jirassic-restore-windows-after-diff
-    (unless jirassic--initial-window-configuration
-      (error "Initial window configuration not saved"))
-    (set-window-configuration jirassic--initial-window-configuration))
-  (setq jirassic--issue-location-for-diff nil))
+  (unwind-protect
+      (progn (mapc #'kill-buffer jirassic--ediff-buffers-to-cleanup)
+             (when ediff-buffer-C
+               (kill-buffer ediff-buffer-C))
+             (when ediff-control-buffer
+               (kill-buffer ediff-control-buffer))
+             (when jirassic-restore-windows-after-diff
+               (unless jirassic--initial-window-configuration
+                 (error "Initial window configuration not saved"))
+               (set-window-configuration jirassic--initial-window-configuration)))
+
+    (setq jirassic--ediff-buffers-to-cleanup nil)
+    (setq jirassic--initial-window-configuration nil)
+    (setq jirassic--issue-location-for-diff nil)))
 
 (defun jirassic--after-issue-merge ()
   "After merging the issue, save the changes to the original buffer."
@@ -184,23 +190,30 @@ Returns the minimum level found, or nil if no headings exist."
         (let ((updated-issue
                (with-current-buffer ediff-buffer-C
                  (buffer-substring-no-properties (point-min) (point-max)))))
-          ;; TODO: What if the buffer has been closed?
           (with-current-buffer (marker-buffer jirassic--issue-location-for-diff)
             (save-restriction
               (save-excursion
                 (widen)
-                (org-back-to-heading t)
-                (org-narrow-to-subtree)
-                (let ((inhibit-read-only t))
+                (cond
+                 ((org-before-first-heading-p)
+                  ;; If the issue is at the file level, we need to
+                  ;; replace the entire buffer.
                   (delete-region (point-min) (point-max))
-                  (insert updated-issue)))))))
+                  (insert updated-issue))
+                 (t
+                  ;; Otherwise, we need to replace the subtree.
+                  (org-back-to-heading t)
+                  (org-narrow-to-subtree)
+                  (let ((inhibit-read-only t))
+                    (delete-region (point-min) (point-max))
+                    (insert updated-issue)))))))))
     (jirassic--issue-ediff-cleanup)))
 
 (defun jirassic--expand-template-for-diff (issue template-keys level)
   "Expand the specified Jira issue template for diffing.
 
 ISSUE is the `jirassic-issue' struct with the latest data.
-TEMPLATE-KEYS is the string key (e.g., \"t\", \"i\") identifying the template.
+TEMPLATE_KEYS is the string key (e.g., \"t\", \"i\") identifying the template.
 
 Returns the expanded template content as a string."
   (let* ((template-defs jirassic-org-capture-templates)
@@ -215,14 +228,16 @@ Returns the expanded template content as a string."
                (template-string (if (stringp template-definition)
                                     template-definition
                                   ;; Handle function/file templates if necessary (more complex)
-                                  (error "Only string templates supported for diff currently"))))
+                                  (error "Only string templates supported for diff currently")))
+               (org-capture-plist
+                (plist-put org-capture-plist :key template-keys)))
           (org-mode)
           (insert (org-capture-fill-template template-string))
           ;; We are expanding the template but we want to have the
           ;; lowest level heading in the buffer to be at `level'.
           (if-let ((min-level (jirassic--min-heading-level-in-buffer))
                    (diff (- level
-                                    min-level)))
+                            min-level)))
               (dotimes (_ diff)
                 (org-map-entries
                  (if (> diff 0)
@@ -271,12 +286,15 @@ Returns the expanded template content as a string."
      (setq jirassic--initial-window-configuration nil)
      (signal (car err) (cdr err))))
 
+  (setq jirassic--issue-location-for-diff (point-marker))
+
   (condition-case err
       (jirassic-bind-restore
-          ((issue-level (org-current-level))
+          ((issue-level (or (org-current-level) 1))
            (id   (org-entry-get nil "issue-id"))
            (key  (org-entry-get nil "issue-key"))
-           (template-key (org-entry-get nil "TEMPLATE_KEYS"))
+           (template-key (or (org-entry-get nil "TEMPLATE_KEYS")
+                             (org-entry-get nil "ROAM_TEMPLATE_KEYS")))
            (buf-current
             (get-buffer-create (format "*jira-%s-current*" id)))
            (buf-latest
@@ -288,22 +306,31 @@ Returns the expanded template content as a string."
             (save-restriction
               (save-excursion
                 (widen)
-                (org-narrow-to-subtree)
-                (buffer-substring-no-properties (point-min) (point-max)))))
+                ;; The issue is either a normal org entry or a file
+                ;; level entry
+                (if (org-before-first-heading-p)
+                    (buffer-string)
+                  (org-narrow-to-subtree)
+                  (buffer-substring-no-properties (point-min) (point-max))))))
            (latest-issue-content
             (if template-key
                 (progn
                   (message "Generating latest version using template '%s'..."
                            template-key)
-                  (jirassic--expand-template-for-diff issue-latest
-                                                      template-key
-                                                      issue-level))
+                  (if (and (featurep 'jirassic-org-roam)
+                           (org-entry-get nil "ROAM_TEMPLATE_KEYS"))
+                      (progn
+                        (jirassic--expand-roam-template-for-diff issue-latest
+                                                                 template-key
+                                                                 issue-level))
+                    (jirassic--expand-template-for-diff issue-latest
+                                                        template-key
+                                                        issue-level)))
               ;; Fallback: Use the original serializer if no key found
               (progn
                 (message "No template key found, using default serializer...")
                 (jirassic--serialize-issue-entry issue-latest issue-level)))))
 
-        (setq jirassic--issue-location-for-diff (point-marker))
         (with-current-buffer buf-latest
           (let ((inhibit-read-only t))
             (erase-buffer)
@@ -373,9 +400,10 @@ Returns the expanded template content as a string."
                                    "[^a-zA-Z0-9_]+" "_"
                                    (downcase (jirassic-issue-summary issue))))
            (issue-org-properties
-            . (jirassic--serialize-properties
-               issue
-               '(("TEMPLATE-KEYS" . ,(org-capture-get :key))))))))
+            . (lambda ()
+                (jirassic--serialize-properties
+                 ,issue
+                 (list (cons jirassic--template-key-property (org-capture-get :key)))))))))
     `(cl-letf ,(mapcar (lambda (binding)
                          (let ((symbol (car binding))
                                (value (cdr binding)))

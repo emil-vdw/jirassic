@@ -52,6 +52,61 @@ available in the template:
 - `issue-project'
 - `issue-link'")
 
+(defvar jirassic--roam-template-key-property "ROAM_TEMPLATE_KEYS"
+  "Org property name for Org-roam template keys.")
+
+(defun jirassic--expand-roam-template-for-diff (issue template-keys level)
+  "Expand the Org-roam template for a given issue."
+
+  (let* ((template-defs jirassic-roam-capture-templates)
+         ;; Find the template definition based on the key
+         (template-found (assoc template-keys template-defs)))
+
+    (unless template-found
+      (error "Org Roam template key '%s' not found in `jirassic-roam-capture-templates'"
+             template-keys))
+
+    ;; Extract the content template string
+    ;; Assumes the structure :target (file+head "file-tmpl" "content-tmpl")
+    (let* ((org-roam-capture--node
+            (or (with-current-buffer (marker-buffer
+                                      jirassic--issue-location-for-diff)
+                  (goto-char (marker-position
+                              jirassic--issue-location-for-diff))
+                  (org-roam-node-at-point))
+                (error "No Org Roam node found for diff")))
+           (expanded-template (org-roam-capture--convert-template template-found))
+           (template-definition (nth 4 expanded-template))
+           ;; Make sure template expansion uses the correct
+           ;; property name.
+           (jirassic--template-key-property
+            jirassic--roam-template-key-property)
+           ;; Set state as if we are capturing using the
+           ;; `template-keys' key values. This is used to set
+           ;; `jirassic--template-key-property' in the template.
+           (org-capture-plist
+            (plist-put org-capture-plist :key template-keys)))
+
+      (with-temp-buffer
+        (org-mode)
+        (jirassic--with-issue-context-funcs issue
+          (insert (org-roam-capture--fill-template template-definition))
+
+          (let ((min-level (jirassic--min-heading-level-in-buffer)))
+            (when min-level
+              (let ((diff (- level min-level)))
+                (cond
+                 ((> diff 0)            ; Need to demote
+                  (message "Demoting headings by %d level(s) to match level %d" diff level)
+                  (dotimes (_ diff)
+                    (org-map-entries #'org-demote-subtree t 'file)))
+                 ((< diff 0)            ; Need to promote
+                  (message "Promoting headings by %d level(s) to match level %d" (abs diff) level)
+                  (dotimes (_ (abs diff))
+                    (org-map-entries #'org-promote-subtree t 'file)))))))
+
+          (buffer-string))))))
+
 ;;;###autoload
 (aio-defun jirassic-org-roam-capture (issue-key &optional goto keys)
   "Capture a Jira issue with Org-roam templates.
@@ -69,7 +124,9 @@ variables, see the `jirassic-roam-capture-templates' variable."
       (let ((issue-key (if (jirassic-issue-link-p issue-key)
                            (jirassic-issue-key-from-link issue-key)
                          issue-key))
-            (issue (aio-await (jirassic-get-issue issue-key))))
+            (issue (aio-await (jirassic-get-issue issue-key)))
+            (jirassic--template-key-property
+             jirassic--roam-template-key-property))
         (jirassic--with-issue-context-funcs issue
           (org-roam-capture- :goto (when goto '(4))
                              ;; :info issue-info
