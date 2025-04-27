@@ -9,7 +9,7 @@
 
 (package-file "jirassic.el")
 
-(load-paths "./" "./test/")
+(load-paths "./" "./test/" "./test/fixtures/")
 
 (script "test" "echo \"Error: no test specified\" && exit 1")
 
