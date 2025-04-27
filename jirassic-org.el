@@ -437,7 +437,9 @@ fall back to the default serializer."
 ;;;###autoload
 (aio-defun jirassic-org-capture (issue-key &optional goto keys)
   "Capture a Jira issue using Org capture templates."
-  (interactive "sIssue key: ")
+  (interactive
+   (list (read-string "Issue key: ")
+         current-prefix-arg))
   (condition-case err
       (let* ((issue (aio-await (jirassic-get-issue issue-key)))
              (org-capture-templates jirassic-org-capture-templates))
