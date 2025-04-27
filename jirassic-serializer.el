@@ -74,6 +74,14 @@ information.")
 (defvar jirassic--inside-table nil
   "Whether we are serializing nodes inside a table.")
 
+(defvar jirassic--panel-icons
+  '(("info" . ℹ️)
+    ("note" . 📝)
+    ("success" . ✅)
+    ("warning" . ⚠️)
+    ("error" . ❗))
+  "Map of panel types to icons.")
+
 (defun jirassic--string-repeat (num s)
   "Repeat string S NUM times."
   (apply #'concat (make-list num s)))
@@ -166,6 +174,19 @@ information.")
 
                 marks text)))
 
+(defun jirassic--serialize-panel (data)
+  "Serialize ADF panel DATA to org strings."
+  (let ((type (jirassic-alist-nget '(attrs panelType) data)))
+    (concat
+     (format "#+begin_%s" type)
+     (format " %s"
+             (alist-get type
+                        jirassic--panel-icons
+                        nil nil #'string=))
+     "\n"
+     (jirassic--serialize-doc-node-content data)
+     (format "#+end_%s\n" type))))
+
 (defun jirassic--serialize-heading (data)
   "Serialize ADF heading objects DATA to org strings."
   (let* ((attrs (alist-get 'attrs data))
@@ -193,6 +214,10 @@ information.")
 (defun jirassic--serialize-mention (data)
   "Serialize ADF mention DATA to org strings."
   (format "=%s=" (alist-get 'text (alist-get 'attrs data))))
+
+(defun jirassic--serialize-status (data)
+  "Serialize ADF mention DATA to org strings."
+  (format "=%s=" (jirassic-alist-nget '(attrs text) data)))
 
 (defun jirassic--serialize-inline-card (data)
   "Serialize ADF inline card DATA to org strings."
@@ -394,8 +419,13 @@ information.")
       (jirassic--serialize-table-cell node))
      ((string= type "tableHeader")
       (jirassic--serialize-table-header node))
+     ((string= type "panel")
+      (jirassic--serialize-panel node))
+     ((string= type "status")
+      (jirassic--serialize-status node))
      (t
-      (message "Unknown type: %s" type)))))
+      (message "Unknown type: %s" type)
+      nil))))
 
 (defun jirassic--serialize-properties (issue &optional extra-properties)
   "Set org entry properties for the given ISSUE.
