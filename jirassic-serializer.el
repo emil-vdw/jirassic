@@ -87,6 +87,38 @@ information.")
   (alist-get "To Do" jirassic-org-todo-state-alist
              jira-status nil #'string-equal))
 
+(defun jirassic--serialize-table (data)
+  "Serialize ADF table object DATA to org strings."
+  (with-temp-buffer
+    (org-mode)
+    (insert "\n")
+    (save-excursion
+      (insert
+       (jirassic--serialize-doc-node-content data)))
+    (org-table-align)
+    (buffer-substring-no-properties
+     (point-min)
+     (point-max))))
+
+(defun jirassic--serialize-table-row (data)
+  "Serialize ADF table object DATA to org strings."
+  (concat
+   "| "
+   (let ((content (alist-get 'content data)))
+     (mapconcat (lambda (node)
+                  (jirassic--serialize-doc-node node))
+                content
+                " | "))
+   " |\n"))
+
+(defun jirassic--serialize-table-header (data)
+  "Serialize ADF table object DATA to org strings."
+  (jirassic--serialize-doc-node-content data))
+
+(defun jirassic--serialize-table-cell (data)
+  "Serialize ADF table cell DATA to org strings."
+  (jirassic--serialize-doc-node-content data))
+
 (defun jirassic--serialize-text (data)
   "Serialize ADF text object DATA to org strings."
   (let* ((text
@@ -134,7 +166,7 @@ information.")
 
 (defun jirassic--serialize-rule (&rest _)
   "Serialize ADF rule objects to org strings."
-  "-----\n")
+  "\n-----\n")
 
 (defun jirassic--serialize-emoji (data)
   "Serialize ADF emoji DATA to org strings."
@@ -243,10 +275,7 @@ information.")
 
 (defun jirassic--serialize-paragraph (data)
   "Serialize ADF paragraph DATA to org strings."
-  (concat
-   (jirassic--serialize-doc-node-content data)
-   (when (= jirassic--list-depth 0)
-     "\n")))
+  (jirassic--serialize-doc-node-content data))
 
 (defun jirassic--serialize-list-item (data)
   "Serialize ADF list item DATA to org strings."
@@ -335,6 +364,14 @@ information.")
       (jirassic--serialize-mention node))
      ((string= type "inlineCard")
       (jirassic--serialize-inline-card node))
+     ((string= type "table")
+      (jirassic--serialize-table node))
+     ((string= type "tableRow")
+      (jirassic--serialize-table-row node))
+     ((string= type "tableCell")
+      (jirassic--serialize-table-cell node))
+     ((string= type "tableHeader")
+      (jirassic--serialize-table-header node))
      (t
       (message "Unknown type: %s" type)))))
 
