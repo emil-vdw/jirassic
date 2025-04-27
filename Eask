@@ -21,3 +21,4 @@
 (depends-on "s" "1.12.0")
 (depends-on "request" "0.3.0")
 (depends-on "org" "9.5")
+(depends-on "org-roam" "2.0")
