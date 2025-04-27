@@ -7,6 +7,8 @@
 ;;; Code:
 
 (require 'org)
+(require 'org-attach)
+(require 'org-capture)
 (require 'ediff)
 
 (require 'aio)
