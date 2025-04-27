@@ -1,0 +1,29 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: purcell/setup-emacs@master
+        with:
+          version: 30.1
+
+      - uses: emacs-eask/setup-eask@master
+        with:
+          version: 'snapshot'
+
+      - name: Install dependencies
+        run: eask install-deps
+
+      - name: Run Indentation Lint
+        run: |
+          eask compile --strict
+          eask lint checkdoc
