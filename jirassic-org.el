@@ -311,13 +311,19 @@ normalized to LEVEL."
           (buffer-string))))))
 
 ;;;###autoload
-(aio-defun jirassic-update-org-issue-entry ()
+(aio-defun jirassic-update-org-issue ()
   "Ediff the current Jira Org entry against the latest version.
 
-1. Grab `issue-id` and `issue-key` from the current Org entry properties.
-2. Copy the current subtree into buffer `*jira-<ID>-current*`.
-3. Fetch the issue from Jira, parse and serialize it into `*jira-<ID>-latest*`.
-4. Call `ediff-buffers` on the two temp buffers."
+Supports issues captured via `jirassic-org-capture' or
+`jirassic-org-roam-capture'.
+
+This function relies on the presence of `:TEMPLATE_KEYS:' or
+`:ROAM_TEMPLATE_KEYS:' (when using Org-roam and `jirassic-org-roam')
+which is included in the `issue-org-properties' function that's used in
+Jirassic capture templates.
+
+When one of these properties cannot be found, the function will
+fall back to the default serializer."
   (interactive)
 
   ;; Handle these user errors and message explicitly because
