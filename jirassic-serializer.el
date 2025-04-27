@@ -34,13 +34,16 @@
 
 (defcustom jirassic-list-item-bullet "+"
   "The character to use for list items."
-  :type 'string)
+  :type 'string
+  :group 'jirassic)
 
 (defcustom jirassic-org-todo-state-alist
   '(("To Do" . "TODO")
     ("In Progress" . "IN PROGRESS")
     ("Done" . "DONE"))
-  "Map Jira status to org todo states.")
+  "Map Jira status to org todo states."
+  :type '(alist :key-type string :value-type string)
+  :group 'jirassic)
 
 (defcustom jirassic-normalize-heading-levels t
   "If non-nil, normalize heading levels from Jira.
@@ -50,7 +53,9 @@ of using 1 and 2 for visual reasons. This does not look great when
 translated to org format.
 
 This reduces the level all heading levels by the amount of smallest
-heading level.")
+heading level."
+  :type 'boolean
+  :group 'jirassic)
 
 (defvar jirassic--list-depth -1
   "The current depth of the list. Used to indent list items.")
@@ -126,7 +131,7 @@ information.")
      (mapconcat #'jirassic--serialize-doc-node content)
      "\n")))
 
-(defun jirassic--serialize-rule (data)
+(defun jirassic--serialize-rule (&rest args)
   "Serialize ADF rule objects to org strings."
   "-----\n")
 
@@ -159,8 +164,7 @@ information.")
 
 (defun jirassic--serialize-codeblock (data)
   (let* ((attrs (alist-get 'attrs data))
-         (language (alist-get 'language attrs))
-         (content (alist-get 'content data)))
+         (language (alist-get 'language attrs)))
     (concat
      "#+BEGIN_SRC"
      (when language
@@ -225,11 +229,9 @@ information.")
 
 (defun jirassic--serialize-doc-node-content (data)
   (let ((content (alist-get 'content data)))
-    (apply
-     #'concat
-     (seq-map-indexed (lambda (node index)
-                        (jirassic--serialize-doc-node node))
-                      content))))
+    (mapconcat (lambda (node)
+                 (jirassic--serialize-doc-node node))
+               content)))
 
 (defun jirassic--serialize-paragraph (data)
   (concat
