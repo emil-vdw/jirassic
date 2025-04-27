@@ -38,7 +38,7 @@
 
 The following variables are
 available in the template:
-- `issue-key': The issue key, e.g. 'XYZ-123'.
+- `issue-key': The issue key, e.g. `XYZ-123'.
 - `issue-id'
 - `issue-description': The issue description, formatted as a
   string.
@@ -50,7 +50,9 @@ available in the template:
 - `issue-creator-name'
 - `issue-creator-email'
 - `issue-project'
-- `issue-link'")
+- `issue-link'"
+  :group 'jirassic
+  :type (get 'org-capture-templates 'custom-type))
 
 (defvar jirassic--roam-template-key-property "ROAM_TEMPLATE_KEYS"
   "Org property name for Org-roam template keys.")
@@ -111,7 +113,7 @@ available in the template:
 (aio-defun jirassic-org-roam-capture (issue-key &optional goto keys)
   "Capture a Jira issue with Org-roam templates.
 
-ISSUE-KEY can be either a normal Jira issue key, eg. 'XYZ-123',
+ISSUE-KEY can be either a normal Jira issue key, eg. `XYZ-123',
 or a full URL to the issue.
 
 GOTO and KEYS function the same as they do in `org-roam-capture'.
@@ -121,12 +123,12 @@ information to the Org-roam template. For a full list of available
 variables, see the `jirassic-roam-capture-templates' variable."
   (interactive "sIssue key: ")
   (condition-case err
-      (let ((issue-key (if (jirassic-issue-link-p issue-key)
-                           (jirassic-issue-key-from-link issue-key)
-                         issue-key))
-            (issue (aio-await (jirassic-get-issue issue-key)))
-            (jirassic--template-key-property
-             jirassic--roam-template-key-property))
+      (let* ((issue-key (if (jirassic-issue-link-p issue-key)
+                            (jirassic-issue-key-from-link issue-key)
+                          issue-key))
+             (issue (aio-await (jirassic-get-issue issue-key)))
+             (jirassic--template-key-property
+              jirassic--roam-template-key-property))
         (jirassic--with-issue-context-funcs issue
           (org-roam-capture- :goto (when goto '(4))
                              ;; :info issue-info

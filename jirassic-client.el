@@ -61,7 +61,7 @@
 (defun jirassic--host ()
   "Return the Jira host URL."
   (or jirassic-host
-      (error "Jira host not set. Use `jirassic-set-host' to set it.")))
+      (error "Jira host not set. Use `jirassic-set-host' to set it")))
 
 (defun jirassic--base-url ()
   "Return the base URL for the Jira API."
@@ -76,7 +76,7 @@
       (error "No credentials found for host: %s" jirassic-host)))
 
 (defun jirassic--http-headers (credentials)
-  "Return the HTTP headers for the Jira API request."
+  "Return the Jira API HTTP auth headers for CREDENTIALS."
   (let* ((username (plist-get credentials :user))
          (secret (plist-get credentials :secret))
          (token (if (functionp secret) (funcall secret) secret)))
@@ -85,10 +85,6 @@
                 (base64-encode-string
                  (concat
                   username ":" token) t))))))
-
-(defun jirassic--default-error-handler (err)
-  "Default error handler for Jira API errors."
-  (error "Jira API error: %s" (jirassic-http-error-message err)))
 
 (cl-defun jirassic--parse-http-error (error-thrown response)
   "Parse a client error from the Jira API response.
@@ -103,8 +99,7 @@ ERROR-THROWN is the error thrown by the request. RESPONSE is the
                ((and (>= status 400)
                      (< status 500)
                      response)
-                (let* ((headers (jirassic-client-response-headers response))
-                       (body (jirassic-client-response-body response))
+                (let* ((body (jirassic-client-response-body response))
                        (message (s-join " " (alist-get 'errorMessages body))))
                   (or message
                       "An unknown error occurred.")))
@@ -123,24 +118,11 @@ ERROR-THROWN is the error thrown by the request. RESPONSE is the
      :response nil)))
 
 (cl-defun jirassic--parse-client-response (response)
-  "Parse a client response from the Jira API response."
+  "Parse a client RESPONSE from the Jira API response."
   (make-jirassic-client-response
    :status (request-response-status-code response)
    :headers (request-response-headers response)
    :body (request-response-data response)))
-
-(cl-defmacro jirassic--error-callback (callback-function)
-  `(cl-function (lambda (&key data error-thrown symbol-status response &allow-other-keys)
-                  (funcall ,callback-function
-                           (jirassic--parse-http-error
-                            error-thrown
-                            response)))))
-
-(cl-defmacro jirassic--then-callback (callback-function)
-  (declare (indent 2))
-  `(cl-function (lambda (&key data &allow-other-keys)
-                  (funcall ,callback-function
-                           data))))
 
 (cl-defun jirassic--get (segments &key params)
   "Make a GET request to the Jira API with SEGMENTS and optional PARAMS.
@@ -165,7 +147,7 @@ an alist of query parameters to include in the request."
                      (aio-resolve promise (lambda () data))))
       :error
       (cl-function
-       (lambda (&key data error-thrown symbol-status response &allow-other-keys)
+       (lambda (&key error-thrown response &allow-other-keys)
          (aio-resolve promise
                       (lambda ()
                         (signal 'jirassic-client-error
@@ -192,12 +174,12 @@ an alist of query parameters to include in the request."
                 (let ((buffer-file-coding-system 'binary))
                   (write-region (point-min) (point-max) to nil 'silent)))
       :headers headers
-      :success (cl-function (lambda (&key data &allow-other-keys)
+      :success (cl-function (lambda (&allow-other-keys)
                               (aio-resolve promise
                                            (lambda ()
                                              to))))
       :error
-      (cl-function (lambda (&key data error-thrown symbol-status response &allow-other-keys)
+      (cl-function (lambda (&key data error-thrown response &allow-other-keys)
                      (aio-resolve promise
                                   (lambda ()
                                     (signal

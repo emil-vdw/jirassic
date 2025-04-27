@@ -22,7 +22,9 @@
   "Whether to download and attach files.
 
 If nil, the media files will be linked to the issue. If t, the media
-files will be downloaded and attached to the org file via `org-attach'.")
+files will be downloaded and attached to the org file via `org-attach'."
+  :type 'boolean
+  :group 'jirassic)
 
 (defcustom jirassic-restore-windows-after-diff t
   "Whether to restore windows after viewing issue changes."
@@ -92,7 +94,7 @@ Returns the minimum level found, or nil if no headings exist."
       min-level)))
 
 (defun jirassic--download-attachments (attachments attachment-dir)
-  "Download attachments to ATTACHMENT-DIR."
+  "Download ATTACHMENTS to ATTACHMENT-DIR."
   (let ((sem (aio-sem jirassic--max-parallel-downloads)))
     (aio-wait-for
      (jirassic-aio-all
@@ -184,7 +186,7 @@ Returns the minimum level found, or nil if no headings exist."
     (setq jirassic--issue-location-for-diff nil)))
 
 (defun jirassic--after-issue-merge ()
-  "After merging the issue, save the changes to the original buffer."
+  "After merging the issue, save the merged issue."
   (unwind-protect
       (when (y-or-n-p "Save changes to the merged issue?")
         (unless (buffer-live-p (marker-buffer jirassic--issue-location-for-diff))
@@ -215,13 +217,14 @@ Returns the minimum level found, or nil if no headings exist."
   "Expand the specified Jira issue template for diffing.
 
 ISSUE is the `jirassic-issue' struct with the latest data.
-TEMPLATE_KEYS is the string key (e.g., \"t\", \"i\") identifying the template.
+TEMPLATE-KEYS is the string key (e.g., \"t\", \"i\") identifying the template.
 
-Returns the expanded template content as a string."
+Returns the expanded template content as a string with headings
+normalized to LEVEL."
   (let* ((template-defs jirassic-org-capture-templates)
          (template-found (assoc template-keys template-defs)))
     (unless template-found
-      (error "Template key '%s' not found for type '%s'" template-keys template-type))
+      (error "Template with key '%s' not found" template-keys))
 
     (with-temp-buffer
       ;; Set up the context needed for template expansion, similar to capture
@@ -360,8 +363,7 @@ Returns the expanded template content as a string."
     ;; Clean up even if there's an error.
     (jirassic-client-error
      (let ((client-error (cdr err)))
-       (message "Error fetching issue %s: %s"
-                (propertize key 'face 'bold)
+       (message "Error fetching latest issue update: %s"
                 (jirassic-http-error-message client-error))
        (jirassic--issue-ediff-cleanup)
        (signal (car err) (cdr err))))
@@ -373,14 +375,14 @@ Returns the expanded template content as a string."
              (signal (car err) (cdr err))))))
 
 (defmacro jirassic--with-issue-context-funcs (issue &rest body)
-  "Dynamically bind functions for ISSUE properties and execute body."
+  "Dynamically bind functions for ISSUE properties and execute BODY."
   (declare (indent 1))
   (let ((bindings
          `((issue-key            . (jirassic-issue-key issue))
            (issue-id             . (jirassic-issue-id issue))
            (issue-summary        . (jirassic-issue-summary issue))
            (issue-description    . (lambda (&optional level)
-                                    (jirassic--doc-string
+                                    (jirassic--serialize-doc
                                      (jirassic-issue-description issue)
                                      ;; In templates, the heading will
                                      ;; normally be at level 1 so the

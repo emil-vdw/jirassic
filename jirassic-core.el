@@ -11,7 +11,7 @@
   "^https://[^/]+/browse/\\([A-Za-z0-9_]\\{2,10\\}-[0-9]\\{1,10\\}\\)$")
 
 (defun jirassic-alist-nget (keys alist)
-  "Get the value of a key in an alist."
+  "Get the nested value for path KEYS in an ALIST."
   (if (seqp keys)
       (seq-reduce (lambda (res key)
                     (alist-get key res))

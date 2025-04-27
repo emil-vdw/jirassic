@@ -22,6 +22,9 @@
 
 
 ;;; Code:
+(eval-when-compile
+  (require 'cl-lib))
+
 (cl-defstruct jirassic-user
   "A Jira user."
   (account-id nil

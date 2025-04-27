@@ -83,12 +83,12 @@ information.")
    "\n:END:\n"))
 
 (defun jirassic--jira-to-org-status (jira-status)
-  "Serialize a JIRA status to an org string."
+  "Serialize a JIRA-STATUS to an org string."
   (alist-get "To Do" jirassic-org-todo-state-alist
              jira-status nil #'string-equal))
 
 (defun jirassic--serialize-text (data)
-  "Serialize ADF text objects to org strings."
+  "Serialize ADF text object DATA to org strings."
   (let* ((text
           ;; There is an edge case here where the text is a checkbox.
           ;; Jira uses a lowercase x for filled checkboxes, but we need to
@@ -118,6 +118,7 @@ information.")
                 marks text)))
 
 (defun jirassic--serialize-heading (data)
+  "Serialize ADF heading objects DATA to org strings."
   (let* ((attrs (alist-get 'attrs data))
          (level (- (+ jirassic--entry-level
                       (alist-get 'level attrs))
@@ -131,20 +132,24 @@ information.")
      (mapconcat #'jirassic--serialize-doc-node content)
      "\n")))
 
-(defun jirassic--serialize-rule (&rest args)
+(defun jirassic--serialize-rule (&rest _)
   "Serialize ADF rule objects to org strings."
   "-----\n")
 
 (defun jirassic--serialize-emoji (data)
+  "Serialize ADF emoji DATA to org strings."
   (alist-get 'text (alist-get 'attrs data)))
 
 (defun jirassic--serialize-mention (data)
+  "Serialize ADF mention DATA to org strings."
   (format "=%s=" (alist-get 'text (alist-get 'attrs data))))
 
 (defun jirassic--serialize-inline-card (data)
+  "Serialize ADF inline card DATA to org strings."
   (format "[[%s]]" (alist-get 'url (alist-get 'attrs data))))
 
 (defun jirassic--serialize-expand (data)
+  "Serialize ADF expand DATA to org strings."
   (let ((title (alist-get 'title (alist-get 'attrs data))))
     (concat
      "#+begin_expand"
@@ -156,6 +161,7 @@ information.")
      "#+end_expand\n\n")))
 
 (defun jirassic--serialize-blockquote (data)
+  "Serialize ADF blockquote DATA to org strings."
   (concat
    "#+BEGIN_QUOTE\n"
    (jirassic--serialize-doc-node-content data)
@@ -163,6 +169,7 @@ information.")
    "#+END_QUOTE\n"))
 
 (defun jirassic--serialize-codeblock (data)
+  "Serialize ADF codeblock DATA to org strings."
   (let* ((attrs (alist-get 'attrs data))
          (language (alist-get 'language attrs)))
     (concat
@@ -175,6 +182,7 @@ information.")
      "#+END_SRC\n")))
 
 (defun jirassic--serialize-bullet-list (data)
+  "Serialize jira ADF bullet list DATA to org bullet lists."
   (setq jirassic--list-depth (1+ jirassic--list-depth))
   (prog1
       (concat
@@ -200,8 +208,7 @@ information.")
     (setq jirassic--list-depth (1- jirassic--list-depth))))
 
 (defun jirassic--serialize-ordered-list (data)
-  "Serialize jira ADF ordered lists to org ordered lists.
-"
+  "Serialize jira ADF ordered list DATA to org ordered lists."
   (setq jirassic--list-depth (1+ jirassic--list-depth))
   (prog1
       (concat
@@ -228,21 +235,25 @@ information.")
    (setq jirassic--list-depth (1- jirassic--list-depth))))
 
 (defun jirassic--serialize-doc-node-content (data)
+  "Serialize the content of a doc node DATA to org strings."
   (let ((content (alist-get 'content data)))
     (mapconcat (lambda (node)
                  (jirassic--serialize-doc-node node))
                content)))
 
 (defun jirassic--serialize-paragraph (data)
+  "Serialize ADF paragraph DATA to org strings."
   (concat
    (jirassic--serialize-doc-node-content data)
    (when (= jirassic--list-depth 0)
      "\n")))
 
 (defun jirassic--serialize-list-item (data)
+  "Serialize ADF list item DATA to org strings."
   (jirassic--serialize-doc-node-content data))
 
 (defun jirassic--serialize-date (data)
+  "Serialize ADF date DATA to org strings."
   (let ((timestamp
          (string-to-number
           (alist-get 'timestamp (alist-get 'attrs data)))))
@@ -251,7 +262,7 @@ information.")
                         (seconds-to-time (/ timestamp 1000)))))
 
 (defun jirassic--find-min-heading-level (data)
-  "Find the minimum heading level in the ADF data."
+  "Find the minimum heading level in the ADF DATA."
   (let ((min-level nil))
     (cl-labels
         ((walk (n)
@@ -277,6 +288,7 @@ information.")
         0)))
 
 (defun jirassic--serialize-doc (doc &optional level)
+  "Serialize ADF doc object DOC to org strings at LEVEL."
   (setq jirassic--list-depth 0)
   (setq jirassic--entry-level (or level 0))
   ;; Normalize heading levels if needed, see
@@ -287,11 +299,8 @@ information.")
             0))
   (jirassic--serialize-doc-node doc))
 
-(defun jirassic--doc-string (doc &optional level)
-  (jirassic--serialize-doc doc level))
-
 (defun jirassic--serialize-doc-node (node)
-  "Serialize ADF objects to org strings."
+  "Serialize ADF NODE to org string."
   (let ((type (alist-get 'type node)))
     (cond
      ((string= type "text")
@@ -330,7 +339,11 @@ information.")
       (message "Unknown type: %s" type)))))
 
 (defun jirassic--serialize-properties (issue &optional extra-properties)
-  "Set org entry properties for the given ISSUE."
+  "Set org entry properties for the given ISSUE.
+
+EXTRA-PROPERTIES is an alist of extra properties to add to the
+properties list. This is useful for adding custom properties
+that are not part of the standard Jira issue properties."
   (jirassic--serialize-org-properties
    (append extra-properties
            `(("issue-key"     . ,(jirassic-issue-key issue))
@@ -342,7 +355,7 @@ information.")
              ("issue-project" . ,(jirassic-issue-project issue))))))
 
 (defun jirassic--serialize-issue-entry (issue &optional level)
-  "Serialize a JIRA issue to an org entry.
+  "Serialize a Jira ISSUE to an org entry at LEVEL.
 
 This function will insert the issue into the current buffer with
 the same behavior as `org-insert-heading'. After inserting the
