@@ -99,8 +99,8 @@ information.")
 
 (defun jirassic--jira-to-org-status (jira-status)
   "Serialize a JIRA-STATUS to an org string."
-  (alist-get "To Do" jirassic-org-todo-state-alist
-             jira-status nil #'string-equal))
+  (alist-get jira-status jirassic-org-todo-state-alist
+             "TODO" nil #'string-equal))
 
 (defun jirassic--serialize-table (data)
   "Serialize ADF table object DATA to org strings."
