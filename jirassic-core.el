@@ -5,6 +5,8 @@
 
 
 ;;; Code:
+(require 'aio)
+
 (defvar jirassic--issue-link-pattern
   "^https://[^/]+/browse/\\([A-Za-z0-9_]\\{2,10\\}-[0-9]\\{1,10\\}\\)$")
 

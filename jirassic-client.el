@@ -10,6 +10,7 @@
 
 (require 'aio)
 (require 'request)
+(require 's)
 
 (require 'jirassic-parser)
 
