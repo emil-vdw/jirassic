@@ -179,7 +179,7 @@ an alist of query parameters to include in the request."
                                            (lambda ()
                                              to))))
       :error
-      (cl-function (lambda (&key data error-thrown response &allow-other-keys)
+      (cl-function (lambda (&key error-thrown response &allow-other-keys)
                      (aio-resolve promise
                                   (lambda ()
                                     (signal
