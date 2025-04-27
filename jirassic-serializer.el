@@ -37,6 +37,11 @@
   :type 'string
   :group 'jirassic)
 
+(defcustom jirassic-new-line-before-heading t
+  "Whether to insert a newline before headings."
+  :type 'boolean
+  :group 'jirassic)
+
 (defcustom jirassic-org-todo-state-alist
   '(("To Do" . "TODO")
     ("In Progress" . "IN PROGRESS")
@@ -66,6 +71,8 @@ heading level."
 
 See `jirassic--find-min-heading-level' for more
 information.")
+(defvar jirassic--inside-table nil
+  "Whether we are serializing nodes inside a table.")
 
 (defun jirassic--string-repeat (num s)
   "Repeat string S NUM times."
@@ -89,16 +96,18 @@ information.")
 
 (defun jirassic--serialize-table (data)
   "Serialize ADF table object DATA to org strings."
-  (with-temp-buffer
-    (org-mode)
-    (insert "\n")
-    (save-excursion
-      (insert
-       (jirassic--serialize-doc-node-content data)))
-    (org-table-align)
-    (buffer-substring-no-properties
-     (point-min)
-     (point-max))))
+  (setq jirassic--inside-table t)
+  (prog1
+      (with-temp-buffer
+        (org-mode)
+        (save-excursion
+          (insert
+           (jirassic--serialize-doc-node-content data)))
+        (org-table-align)
+        (buffer-substring-no-properties
+         (point-min)
+         (point-max)))
+    (setq jirassic--inside-table nil)))
 
 (defun jirassic--serialize-table-row (data)
   "Serialize ADF table object DATA to org strings."
@@ -145,7 +154,15 @@ information.")
                      ((string= type "code")
                       (format "~%s~" formatted-text))
                      ((string= type "link")
-                      (format "[[%s][%s]]" (alist-get 'href attrs) text)))))
+                      (format "[[%s][%s]]" (alist-get 'href attrs) text))
+                     ((and (string= type "subsup")
+                           (string=
+                            (alist-get 'type attrs) "sup"))
+                      (format "^{%s}" formatted-text))
+                     ((and (string= type "subsup")
+                           (string=
+                            (alist-get 'type attrs) "sub"))
+                      (format "_{%s}" formatted-text)))))
 
                 marks text)))
 
@@ -158,7 +175,8 @@ information.")
          (content (alist-get 'content data)))
     (concat
      ;; Insert a newline before every heading
-     "\n"
+     (when jirassic-new-line-before-heading
+       "\n")
      (jirassic--string-repeat level "*")
      " "
      (mapconcat #'jirassic--serialize-doc-node content)
@@ -166,7 +184,7 @@ information.")
 
 (defun jirassic--serialize-rule (&rest _)
   "Serialize ADF rule objects to org strings."
-  "\n-----\n")
+  "-----\n")
 
 (defun jirassic--serialize-emoji (data)
   "Serialize ADF emoji DATA to org strings."
@@ -275,7 +293,11 @@ information.")
 
 (defun jirassic--serialize-paragraph (data)
   "Serialize ADF paragraph DATA to org strings."
-  (jirassic--serialize-doc-node-content data))
+  (concat
+   (jirassic--serialize-doc-node-content data)
+   (when (and (= 0 jirassic--list-depth)
+              (not jirassic--inside-table))
+     "\n")))
 
 (defun jirassic--serialize-list-item (data)
   "Serialize ADF list item DATA to org strings."
