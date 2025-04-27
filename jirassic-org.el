@@ -37,7 +37,7 @@ files will be downloaded and attached to the org file via `org-attach'."
 
 (defcustom jirassic-org-capture-templates
   `(("t" "Todo" entry
-     (file+olp org-default-notes-file "tasks" "foo")
+     (file org-default-notes-file)
      ,(concat "* %(issue-todo-state) %(issue-summary)\n"
               "%(issue-org-properties)\n"
               "%(issue-description)")))
