@@ -1,0 +1,67 @@
+* IN PROGRESS Test Issue for API Serialization
+:PROPERTIES:
+:TEMPLATE_KEYS: t
+:issue-key: KAN-1
+:issue-link: https://jirassic.atlassian.net/rest/api/3/issue/10000
+:issue-id: 10000
+:issue-type: Task
+:issue-creator: Pieter Koekemoer
+:issue-project: KAN
+:END:
+
+
+** 🛠️ Test Issue for API Serialization
+/This is a dummy Jira ticket created for testing purposes./
+The goal is to validate the serialization and deserialization of Jira API responses within our application.
+-----
+
+*** 📋 Acceptance Criteria
++ The issue can be retrieved via the API.
++ The serialized fields match the original Jira fields (e.g., ~summary~, ~description~, ~status~, ~priority~, ~assignee~).
++ No unexpected fields or errors occur during parsing.
+
+#+BEGIN_SRC c
+int main() {
+  printf("Hello World!");
+  return 0;
+} 
+#+END_SRC
+-----
+
+*** 🧪 Steps to Reproduce
+
+**** Create a request to fetch this issue via the Jira API:
+
+#+begin_expand
+GET /rest/api/3/issue/PROJ-123
+#+end_expand
+
+#+begin_expand *Old API*
+GET /rest/api/3/issue/PROJ-123
+#+end_expand
+
+
+**** Serialize the _{response} into your application's model.
+
+**** Validate the model fields against expected values.
+-----
+
+*** 📌 Priority
+/Medium/
+
+*** 🏷️ Labels
++ ~testing~
++ ~api~
++ ~serialization~
+-----
+
+*** ⚙️ Additional Info
+bq. /This issue is only for internal testing. No action needed from the product team./
+
+#+begin_info ℹ️
+Include some useless information =Done=
+ second line
+#+end_info
+|      | *number* | *square* |
+| even |        5 |       25 |
+| odd  |        2 |        4 |
