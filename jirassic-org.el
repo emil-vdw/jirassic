@@ -6,10 +6,10 @@
 
 ;;; Code:
 
+(require 'ediff)
 (require 'org)
 (require 'org-attach)
 (require 'org-capture)
-(require 'ediff)
 
 (require 'aio)
 
@@ -219,7 +219,8 @@ Returns the minimum level found, or nil if no headings exist."
 
 (defmacro jirassic--with-issue-context-funcs (issue &rest body)
   "Dynamically bind functions for ISSUE properties and execute BODY."
-  (declare (indent 1))
+  (declare (indent 1)
+           (debug (form body)))
   (let ((bindings
          `((issue-key            . (jirassic-issue-key issue))
            (issue-id             . (jirassic-issue-id issue))
@@ -247,10 +248,12 @@ Returns the minimum level found, or nil if no headings exist."
                                    "[^a-zA-Z0-9_]+" "_"
                                    (downcase (jirassic-issue-summary issue))))
            (issue-org-properties
-            . (lambda ()
+            . (lambda (&optional extra-properties)
                 (jirassic--serialize-properties
                  ,issue
-                 (list (cons jirassic--template-key-property (org-capture-get :key)))))))))
+                 (append
+                  extra-properties
+                  (list (cons jirassic--template-key-property (org-capture-get :key))))))))))
     `(cl-letf ,(mapcar (lambda (binding)
                          (let ((symbol (car binding))
                                (value (cdr binding)))
@@ -279,14 +282,16 @@ normalized to LEVEL."
       ;; Set up the context needed for template expansion, similar to capture
       (jirassic--with-issue-context-funcs issue
         (let* ((template-definition (nth 4 template-found)) ; Get the template content part
-               (template-string (if (stringp template-definition)
-                                    template-definition
-                                  ;; Handle function/file templates if necessary (more complex)
-                                  (error "Only string templates supported for diff currently")))
+               ;; Load the template in case it's a file or function
+               (template-text
+                (let ((org-capture-plist `(:template ,template-definition)))
+                  (ignore)
+                  (org-capture-get-template)
+                  (org-capture-get :template)))
                (org-capture-plist
                 (plist-put org-capture-plist :key template-keys)))
           (org-mode)
-          (insert (org-capture-fill-template template-string))
+          (insert (org-capture-fill-template template-text))
           ;; We are expanding the template but we want to have the
           ;; lowest level heading in the buffer to be at `level'.
           (if-let ((min-level (jirassic--min-heading-level-in-buffer))
@@ -295,8 +300,8 @@ normalized to LEVEL."
               (dotimes (_ diff)
                 (org-map-entries
                  (if (> diff 0)
-                     #'org-demote-subtree
-                   #'org-promote-subtree)
+                     #'org-demote
+                   #'org-promote)
                  t nil)))
           ;; There might be an `:ATTACH:' tag in the template
           (unless (or (seq-empty-p (jirassic-issue-attachments issue))
