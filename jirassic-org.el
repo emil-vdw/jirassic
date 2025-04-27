@@ -213,6 +213,51 @@ Returns the minimum level found, or nil if no headings exist."
                     (insert updated-issue)))))))))
     (jirassic--issue-ediff-cleanup)))
 
+(defmacro jirassic--with-issue-context-funcs (issue &rest body)
+  "Dynamically bind functions for ISSUE properties and execute BODY."
+  (declare (indent 1))
+  (let ((bindings
+         `((issue-key            . (jirassic-issue-key issue))
+           (issue-id             . (jirassic-issue-id issue))
+           (issue-summary        . (jirassic-issue-summary issue))
+           (issue-description    . (lambda (&optional level)
+                                    (jirassic--serialize-doc
+                                     (jirassic-issue-description issue)
+                                     ;; In templates, the heading will
+                                     ;; normally be at level 1 so the
+                                     ;; description defaults to start
+                                     ;; at level 2.
+                                     (or level 2))))
+           (issue-type           . (jirassic-issue-type issue))
+           (issue-priority       . (jirassic-issue-priority issue))
+           (issue-status         . (jirassic-issue-status issue))
+           (issue-todo-state     . (jirassic--jira-to-org-status
+                                   (jirassic-issue-status issue)))
+           (issue-creator-name   . (jirassic-user-display-name
+                                   (jirassic-issue-creator issue)))
+           (issue-creator-email  . (jirassic-user-email-address
+                                   (jirassic-issue-creator issue)))
+           (issue-project        . (jirassic-issue-project issue))
+           (issue-link           . (jirassic-issue-link issue))
+           (issue-summary-slug   . (replace-regexp-in-string
+                                   "[^a-zA-Z0-9_]+" "_"
+                                   (downcase (jirassic-issue-summary issue))))
+           (issue-org-properties
+            . (lambda ()
+                (jirassic--serialize-properties
+                 ,issue
+                 (list (cons jirassic--template-key-property (org-capture-get :key)))))))))
+    `(cl-letf ,(mapcar (lambda (binding)
+                         (let ((symbol (car binding))
+                               (value (cdr binding)))
+                           `((symbol-function ',symbol)
+                             (lambda (&rest args)
+                               (if (functionp ,value)
+                                   (apply ,value args)
+                                 ,value)))))
+                       bindings)
+       ,@body)))
+
 (defun jirassic--expand-template-for-diff (issue template-keys level)
   "Expand the specified Jira issue template for diffing.
 
@@ -373,51 +418,6 @@ normalized to LEVEL."
              (message (error-message-string err))
              (jirassic--issue-ediff-cleanup)
              (signal (car err) (cdr err))))))
-
-(defmacro jirassic--with-issue-context-funcs (issue &rest body)
-  "Dynamically bind functions for ISSUE properties and execute BODY."
-  (declare (indent 1))
-  (let ((bindings
-         `((issue-key            . (jirassic-issue-key issue))
-           (issue-id             . (jirassic-issue-id issue))
-           (issue-summary        . (jirassic-issue-summary issue))
-           (issue-description    . (lambda (&optional level)
-                                    (jirassic--serialize-doc
-                                     (jirassic-issue-description issue)
-                                     ;; In templates, the heading will
-                                     ;; normally be at level 1 so the
-                                     ;; description defaults to start
-                                     ;; at level 2.
-                                     (or level 2))))
-           (issue-type           . (jirassic-issue-type issue))
-           (issue-priority       . (jirassic-issue-priority issue))
-           (issue-status         . (jirassic-issue-status issue))
-           (issue-todo-state     . (jirassic--jira-to-org-status
-                                   (jirassic-issue-status issue)))
-           (issue-creator-name   . (jirassic-user-display-name
-                                   (jirassic-issue-creator issue)))
-           (issue-creator-email  . (jirassic-user-email-address
-                                   (jirassic-issue-creator issue)))
-           (issue-project        . (jirassic-issue-project issue))
-           (issue-link           . (jirassic-issue-link issue))
-           (issue-summary-slug   . (replace-regexp-in-string
-                                   "[^a-zA-Z0-9_]+" "_"
-                                   (downcase (jirassic-issue-summary issue))))
-           (issue-org-properties
-            . (lambda ()
-                (jirassic--serialize-properties
-                 ,issue
-                 (list (cons jirassic--template-key-property (org-capture-get :key)))))))))
-    `(cl-letf ,(mapcar (lambda (binding)
-                         (let ((symbol (car binding))
-                               (value (cdr binding)))
-                           `((symbol-function ',symbol)
-                             (lambda (&rest args)
-                               (if (functionp ,value)
-                                   (apply ,value args)
-                                 ,value)))))
-                       bindings)
-       ,@body)))
 
 ;;;###autoload
 (aio-defun jirassic-org-capture (issue-key &optional goto keys)
