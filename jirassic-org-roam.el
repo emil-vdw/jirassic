@@ -112,17 +112,19 @@ TEMPLATE-KEYS is the string key (e.g., \"t\", \"i\") identifying the template."
           (buffer-string))))))
 
 ;;;###autoload
-(defun jirassic-org-roam-capture (issue-key &optional goto keys)
+(cl-defun jirassic-org-roam-capture (issue-key &key goto keys templates)
   "Capture a Jira issue with Org-roam templates.
 
 ISSUE-KEY can be either a normal Jira issue key, eg. `XYZ-123',
 or a full URL to the issue.
 
 GOTO and KEYS function the same as they do in `org-roam-capture'.
+TEMPLATES is a list of Org-roam templates to use for capturing,
+and defaults to `jirassic-roam-capture-templates'.
 
-This function fetches the Jira issue and supplies a lot of extra
-information to the Org-roam template. For a full list of available
-variables, see the `jirassic-roam-capture-templates' variable."
+Fetches the Jira issue and supplies a lot of extra information to the
+Org-roam template. For a full list of available variables, see the
+`jirassic-roam-capture-templates' variable."
   (interactive "sIssue key: ")
   (aio-with-async
     (condition-case err
@@ -137,7 +139,8 @@ variables, see the `jirassic-roam-capture-templates' variable."
                                ;; :info issue-info
                                :keys keys
                                :node (org-roam-node-create)
-                               :templates jirassic-roam-capture-templates)))
+                               :templates (or templates
+                                              jirassic-roam-capture-templates))))
 
       (jirassic-client-error
        (message "Error fetching issue '%s': %s"
