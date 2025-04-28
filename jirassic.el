@@ -1,4 +1,4 @@
-;;; jirassic.el --- An Org mode centered Jira client -*- lexical-binding: t; -*-
+;;; jirassic.el --- An Org centered Jira client -*- lexical-binding: t; -*-
 
 ;; Author: Emil van der Westhuizen <vdwemil@protonmail.com>
 ;; Maintainer: Emil van der Westhuizen <vdwemil@protonmail.com>
@@ -17,7 +17,10 @@
 ;; search for issues and retrieve issue details.
 
 ;;; Code:
-
+(defgroup jirassic nil
+  "Org centered Jira client."
+  :link '(url-link "https://github.com/emil-vdw/jirassic")
+  :group 'tool)
 
 (provide 'jirassic)
 ;;; jirassic.el ends here

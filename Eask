@@ -2,7 +2,7 @@
 
 (package "jirassic"
          "0.1"
-         "An Org mode centered Jira client")
+         "An Org centered Jira client")
 
 (website-url "https://github.com/emil-vdw/jirassic")
 (keywords "tools" "convenience" "jira")
