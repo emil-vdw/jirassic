@@ -27,7 +27,7 @@
  "jirassic-serializer.el")
 
 (depends-on "emacs" "26.1")
-(depends-on "aio" "1.0.0")
+(depends-on "aio" "1.0")
 (depends-on "f" "0.20.0")
 (depends-on "dash" "2.0.0")
 (depends-on "s" "1.12.0")
