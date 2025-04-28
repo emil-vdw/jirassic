@@ -2,10 +2,9 @@
 
 ;;; Commentary:
 
-;; This file provides Org Mode integration for the Jirassic package.
+;; Capture Jira issues using Org capture templates.
 
 ;;; Code:
-
 (require 'ediff)
 (require 'org)
 (require 'org-attach)
@@ -316,7 +315,7 @@ normalized to LEVEL."
           (buffer-string))))))
 
 ;;;###autoload
-(aio-defun jirassic-update-org-issue ()
+(defun jirassic-update-org-issue ()
   "Ediff the current Jira Org entry against the latest version.
 
 Supports issues captured via `jirassic-org-capture' or
@@ -330,132 +329,133 @@ Jirassic capture templates.
 When one of these properties cannot be found, the function will
 fall back to the default serializer."
   (interactive)
+  (aio-with-async
+    ;; Handle these user errors and message explicitly because
+    ;; these `user-error's that happen in async interactive
+    ;; functions are not reported to the user.
+    (condition-case err
+        (progn
+          (when jirassic--issue-location-for-diff
+            (user-error "Already requesting issue changes"))
+          (unless (derived-mode-p 'org-mode)
+            (user-error "Not in Org-mode buffer"))
+          (unless (jirassic-org-issue-entry-p)
+            (user-error "Not in a Jira issue entry"))
+          ;; Store the window configuration before we start the ediff session
+          ;; so that we can restore it later.
+          (setq jirassic--initial-window-configuration (current-window-configuration)))
 
-  ;; Handle these user errors and message explicitly because
-  ;; these `user-error's that happen in async interactive
-  ;; functions are not reported to the user.
-  (condition-case err
-      (progn
-        (when jirassic--issue-location-for-diff
-          (user-error "Already requesting issue changes"))
-        (unless (derived-mode-p 'org-mode)
-          (user-error "Not in Org-mode buffer"))
-        (unless (jirassic-org-issue-entry-p)
-          (user-error "Not in a Jira issue entry"))
-        ;; Store the window configuration before we start the ediff session
-        ;; so that we can restore it later.
-        (setq jirassic--initial-window-configuration (current-window-configuration)))
-
-    (user-error
-     (message (error-message-string err))
-     (setq jirassic--initial-window-configuration nil)
-     (signal (car err) (cdr err))))
-
-  (setq jirassic--issue-location-for-diff (point-marker))
-
-  (condition-case err
-      (jirassic-bind-restore
-          ((issue-level (or (org-current-level) 1))
-           (id   (org-entry-get nil "issue-id"))
-           (key  (org-entry-get nil "issue-key"))
-           (template-key (or (org-entry-get nil "TEMPLATE_KEYS")
-                             (org-entry-get nil "ROAM_TEMPLATE_KEYS")))
-           (buf-current
-            (get-buffer-create (format "*jira-%s-current*" id)))
-           (buf-latest
-            (get-buffer-create (format "*jira-%s-latest*" id)))
-           (issue-latest (progn
-                           (message "Fetching latest data for issue %s..." key)
-                           (aio-await (jirassic-get-issue key))))
-           (current-issue-content
-            (save-restriction
-              (save-excursion
-                (widen)
-                ;; The issue is either a normal org entry or a file
-                ;; level entry
-                (if (org-before-first-heading-p)
-                    (buffer-string)
-                  (org-narrow-to-subtree)
-                  (buffer-substring-no-properties (point-min) (point-max))))))
-           (latest-issue-content
-            (if template-key
-                (progn
-                  (message "Generating latest version using template '%s'..."
-                           template-key)
-                  (if (and (featurep 'jirassic-org-roam)
-                           (org-entry-get nil "ROAM_TEMPLATE_KEYS"))
-                      (progn
-                        (jirassic--expand-roam-template-for-diff issue-latest
-                                                                 template-key
-                                                                 issue-level))
-                    (jirassic--expand-template-for-diff issue-latest
-                                                        template-key
-                                                        issue-level)))
-              ;; Fallback: Use the original serializer if no key found
-              (progn
-                (message "No template key found, using default serializer...")
-                (jirassic--serialize-issue-entry issue-latest issue-level)))))
-
-        (with-current-buffer buf-latest
-          (let ((inhibit-read-only t))
-            (erase-buffer)
-            (org-mode)
-            ;; Make sure that the issue is serialized at the same level as
-            ;; the current issue.
-            (insert latest-issue-content)))
-
-        (with-current-buffer buf-current
-          (let ((inhibit-read-only t))
-            (erase-buffer)
-            (org-mode)
-            (insert current-issue-content)))
-
-        (push buf-current jirassic--ediff-buffers-to-cleanup)
-        (push buf-latest jirassic--ediff-buffers-to-cleanup)
-
-        (ediff-merge-buffers buf-current buf-latest
-                             (list
-                              (lambda ()
-                                (setq-local ediff-quit-merge-hook
-                                            (cons #'jirassic--after-issue-merge
-                                                  ediff-quit-merge-hook))))))
-
-    ;; Clean up even if there's an error.
-    (jirassic-client-error
-     (let ((client-error (cdr err)))
-       (message "Error fetching latest issue update: %s"
-                (jirassic-http-error-message client-error))
-       (jirassic--issue-ediff-cleanup)
+      (user-error
+       (message (error-message-string err))
+       (setq jirassic--initial-window-configuration nil)
        (signal (car err) (cdr err))))
 
-    (error (progn
-             ;; Notify the user of the error and re-raise
-             (message (error-message-string err))
-             (jirassic--issue-ediff-cleanup)
-             (signal (car err) (cdr err))))))
+    (setq jirassic--issue-location-for-diff (point-marker))
+
+    (condition-case err
+        (jirassic-bind-restore
+            ((issue-level (or (org-current-level) 1))
+             (id   (org-entry-get nil "issue-id"))
+             (key  (org-entry-get nil "issue-key"))
+             (template-key (or (org-entry-get nil "TEMPLATE_KEYS")
+                               (org-entry-get nil "ROAM_TEMPLATE_KEYS")))
+             (buf-current
+              (get-buffer-create (format "*jira-%s-current*" id)))
+             (buf-latest
+              (get-buffer-create (format "*jira-%s-latest*" id)))
+             (issue-latest (progn
+                             (message "Fetching latest data for issue %s..." key)
+                             (aio-await (jirassic-get-issue key))))
+             (current-issue-content
+              (save-restriction
+                (save-excursion
+                  (widen)
+                  ;; The issue is either a normal org entry or a file
+                  ;; level entry
+                  (if (org-before-first-heading-p)
+                      (buffer-string)
+                    (org-narrow-to-subtree)
+                    (buffer-substring-no-properties (point-min) (point-max))))))
+             (latest-issue-content
+              (if template-key
+                  (progn
+                    (message "Generating latest version using template '%s'..."
+                             template-key)
+                    (if (and (featurep 'jirassic-org-roam)
+                             (org-entry-get nil "ROAM_TEMPLATE_KEYS"))
+                        (progn
+                          (jirassic--expand-roam-template-for-diff issue-latest
+                                                                   template-key
+                                                                   issue-level))
+                      (jirassic--expand-template-for-diff issue-latest
+                                                          template-key
+                                                          issue-level)))
+                ;; Fallback: Use the original serializer if no key found
+                (progn
+                  (message "No template key found, using default serializer...")
+                  (jirassic--serialize-issue-entry issue-latest issue-level)))))
+
+          (with-current-buffer buf-latest
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (org-mode)
+              ;; Make sure that the issue is serialized at the same level as
+              ;; the current issue.
+              (insert latest-issue-content)))
+
+          (with-current-buffer buf-current
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (org-mode)
+              (insert current-issue-content)))
+
+          (push buf-current jirassic--ediff-buffers-to-cleanup)
+          (push buf-latest jirassic--ediff-buffers-to-cleanup)
+
+          (ediff-merge-buffers buf-current buf-latest
+                               (list
+                                (lambda ()
+                                  (setq-local ediff-quit-merge-hook
+                                              (cons #'jirassic--after-issue-merge
+                                                    ediff-quit-merge-hook))))))
+
+      ;; Clean up even if there's an error.
+      (jirassic-client-error
+       (let ((client-error (cdr err)))
+         (message "Error fetching latest issue update: %s"
+                  (jirassic-http-error-message client-error))
+         (jirassic--issue-ediff-cleanup)
+         (signal (car err) (cdr err))))
+
+      (error (progn
+               ;; Notify the user of the error and re-raise
+               (message (error-message-string err))
+               (jirassic--issue-ediff-cleanup)
+               (signal (car err) (cdr err)))))))
 
 ;;;###autoload
-(aio-defun jirassic-org-capture (issue-key &optional goto keys)
+(defun jirassic-org-capture (issue-key &optional goto keys)
   "Capture a Jira issue using Org capture templates."
   (interactive
    (list (read-string "Issue key: ")
          current-prefix-arg))
-  (condition-case err
-      (let* ((issue (aio-await (jirassic-get-issue issue-key)))
-             (org-capture-templates jirassic-org-capture-templates))
-        (jirassic--with-issue-context-funcs issue
+  (aio-with-async
+    (condition-case err
+        (let* ((issue (aio-await (jirassic-get-issue issue-key)))
+               (org-capture-templates jirassic-org-capture-templates))
+          (jirassic--with-issue-context-funcs issue
             (org-capture goto keys)))
 
-    (jirassic-client-error
-     (message "Error fetching issue '%s': %s"
-              issue-key
-              (jirassic-http-error-message (cdr err)))
-     (signal (car err) (cdr err)))
-    (error
-     (message "Error capturing issue %s: %s"
-              issue-key
-              (error-message-string err))
-     (signal (car err) (cdr err)))))
+      (jirassic-client-error
+       (message "Error fetching issue '%s': %s"
+                issue-key
+                (jirassic-http-error-message (cdr err)))
+       (signal (car err) (cdr err)))
+      (error
+       (message "Error capturing issue %s: %s"
+                issue-key
+                (error-message-string err))
+       (signal (car err) (cdr err))))))
 
 (add-hook 'org-capture-after-finalize-hook #'jirassic--org-capture-finalize)
 

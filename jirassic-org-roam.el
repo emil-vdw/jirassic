@@ -112,7 +112,7 @@ TEMPLATE-KEYS is the string key (e.g., \"t\", \"i\") identifying the template."
           (buffer-string))))))
 
 ;;;###autoload
-(aio-defun jirassic-org-roam-capture (issue-key &optional goto keys)
+(defun jirassic-org-roam-capture (issue-key &optional goto keys)
   "Capture a Jira issue with Org-roam templates.
 
 ISSUE-KEY can be either a normal Jira issue key, eg. `XYZ-123',
@@ -124,31 +124,32 @@ This function fetches the Jira issue and supplies a lot of extra
 information to the Org-roam template. For a full list of available
 variables, see the `jirassic-roam-capture-templates' variable."
   (interactive "sIssue key: ")
-  (condition-case err
-      (let* ((issue-key (if (jirassic-issue-link-p issue-key)
-                            (jirassic-issue-key-from-link issue-key)
-                          issue-key))
-             (issue (aio-await (jirassic-get-issue issue-key)))
-             (jirassic--template-key-property
-              jirassic--roam-template-key-property))
-        (jirassic--with-issue-context-funcs issue
-          (org-roam-capture- :goto (when goto '(4))
-                             ;; :info issue-info
-                             :keys keys
-                             :node (org-roam-node-create)
-                             :templates jirassic-roam-capture-templates)))
+  (aio-with-async
+    (condition-case err
+        (let* ((issue-key (if (jirassic-issue-link-p issue-key)
+                              (jirassic-issue-key-from-link issue-key)
+                            issue-key))
+               (issue (aio-await (jirassic-get-issue issue-key)))
+               (jirassic--template-key-property
+                jirassic--roam-template-key-property))
+          (jirassic--with-issue-context-funcs issue
+            (org-roam-capture- :goto (when goto '(4))
+                               ;; :info issue-info
+                               :keys keys
+                               :node (org-roam-node-create)
+                               :templates jirassic-roam-capture-templates)))
 
-    (jirassic-client-error
-     (message "Error fetching issue '%s': %s"
-              (propertize issue-key 'face 'bold)
-              (jirassic-http-error-message (cdr err)))
-     (signal (car err) (cdr err)))
+      (jirassic-client-error
+       (message "Error fetching issue '%s': %s"
+                (propertize issue-key 'face 'bold)
+                (jirassic-http-error-message (cdr err)))
+       (signal (car err) (cdr err)))
 
-    (error
-     (message "Error capturing issue %s: %s"
-              (propertize issue-key 'face 'bold)
-              (error-message-string err))
-     (signal (car err) (cdr err)))))
+      (error
+       (message "Error capturing issue %s: %s"
+                (propertize issue-key 'face 'bold)
+                (error-message-string err))
+       (signal (car err) (cdr err))))))
 
 (provide 'jirassic-org-roam)
 ;;; jirassic-org-roam.el ends here

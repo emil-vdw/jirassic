@@ -12,9 +12,7 @@
 
 ;;; Commentary:
 
-;; This is a Jira client for Emacs. It allows you to interact with
-;; Jira's REST API to create, update, and delete issues, as well as
-;; search for issues and retrieve issue details.
+;; Provides an Org centered Jira client.
 
 ;;; Code:
 (defgroup jirassic nil
