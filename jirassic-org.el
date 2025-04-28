@@ -225,27 +225,27 @@ Returns the minimum level found, or nil if no headings exist."
            (issue-id             . (jirassic-issue-id issue))
            (issue-summary        . (jirassic-issue-summary issue))
            (issue-description    . (lambda (&optional level)
-                                    (jirassic--serialize-doc
-                                     (jirassic-issue-description issue)
-                                     ;; In templates, the heading will
-                                     ;; normally be at level 1 so the
-                                     ;; description defaults to start
-                                     ;; at level 2.
-                                     (or level 2))))
+                                     (jirassic--serialize-doc
+                                      (jirassic-issue-description issue)
+                                      ;; In templates, the heading will
+                                      ;; normally be at level 1 so the
+                                      ;; description defaults to start
+                                      ;; at level 2.
+                                      (or level 2))))
            (issue-type           . (jirassic-issue-type issue))
            (issue-priority       . (jirassic-issue-priority issue))
            (issue-status         . (jirassic-issue-status issue))
            (issue-todo-state     . (jirassic--jira-to-org-status
-                                   (jirassic-issue-status issue)))
+                                    (jirassic-issue-status issue)))
            (issue-creator-name   . (jirassic-user-display-name
-                                   (jirassic-issue-creator issue)))
+                                    (jirassic-issue-creator issue)))
            (issue-creator-email  . (jirassic-user-email-address
-                                   (jirassic-issue-creator issue)))
+                                    (jirassic-issue-creator issue)))
            (issue-project        . (jirassic-issue-project issue))
            (issue-link           . (jirassic-issue-link issue))
            (issue-summary-slug   . (replace-regexp-in-string
-                                   "[^a-zA-Z0-9_]+" "_"
-                                   (downcase (jirassic-issue-summary issue))))
+                                    "[^a-zA-Z0-9_]+" "_"
+                                    (downcase (jirassic-issue-summary issue))))
            (issue-org-properties
             . (lambda (&optional extra-properties)
                 (jirassic--serialize-properties

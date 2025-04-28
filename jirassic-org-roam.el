@@ -112,7 +112,7 @@ TEMPLATE-KEYS is the string key (e.g., \"t\", \"i\") identifying the template."
           (buffer-string))))))
 
 ;;;###autoload
-(cl-defun jirassic-org-roam-capture (issue-key &key goto keys templates)
+(cl-defun jirassic-org-roam-capture (issue-key &key goto keys node info props templates)
   "Capture a Jira issue with Org-roam templates.
 
 ISSUE-KEY can be either a normal Jira issue key, eg. `XYZ-123',
@@ -138,7 +138,9 @@ Org-roam template. For a full list of available variables, see the
             (org-roam-capture- :goto (when goto '(4))
                                ;; :info issue-info
                                :keys keys
-                               :node (org-roam-node-create)
+                               :node (or node (org-roam-node-create))
+                               :info info
+                               :props props
                                :templates (or templates
                                               jirassic-roam-capture-templates))))
 
