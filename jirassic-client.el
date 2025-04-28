@@ -174,7 +174,7 @@ an alist of query parameters to include in the request."
                 (let ((buffer-file-coding-system 'binary))
                   (write-region (point-min) (point-max) to nil 'silent)))
       :headers headers
-      :success (cl-function (lambda (&allow-other-keys)
+      :success (cl-function (lambda (&rest _)
                               (aio-resolve promise
                                            (lambda ()
                                              to))))
