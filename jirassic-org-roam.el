@@ -29,7 +29,7 @@
      :target
      (file+head "%(issue-key)-%(issue-summary-slug).org"
                 ,(concat
-                  "%(issue-org-properties)"
+                  "%(issue-org-properties `((\"ROAM_ALIASES\" . ,(issue-key))))"
                   "#+title: %(issue-summary)\n"
                   "#+category: %(issue-summary)\n\n"
                   "%(issue-description)"))
@@ -135,7 +135,7 @@ Org-roam template. For a full list of available variables, see the
                (jirassic--template-key-property
                 jirassic--roam-template-key-property))
           (jirassic--with-issue-context-funcs issue
-            (org-roam-capture- :goto (when goto '(4))
+            (org-roam-capture- :goto goto
                                ;; :info issue-info
                                :keys keys
                                :node (or node (org-roam-node-create))
