@@ -18,7 +18,7 @@
       ("heading" (jirassic--parse-heading node))
       ("text" (jirassic--parse-text node))
       ("rule" (make-adf-rule))
-      ("emoji" (make-adf-emoji :text .text))
+      ("emoji" (make-adf-emoji :text .attrs.text))
       ("bulletList" (make-adf-emoji :content (jirassic--parse-content .content)))
       ("orderedList" (make-adf-ordered-list :content (jirassic--parse-content .content)))
       ("listItem" (make-adf-list-item :content (jirassic--parse-content .content)))

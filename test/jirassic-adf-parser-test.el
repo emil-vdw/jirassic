@@ -75,5 +75,13 @@
       (should (jirassic-test--marks-equal
                (nth 8 marks) (make-adf-mark :type 'underline))))))
 
+(ert-deftest jirassic-parser-test-parse-emoji ()
+  "Test that emojis parsed correctly."
+  (let ((emoji (jirassic-parse-adf-node '((type . "emoji")
+                                          (attrs (shortName . ":thinking:")
+                                                 (id . "1f914") (text . "🤔"))))))
+    (should (cl-typep emoji 'adf-emoji))
+    (should (string= (adf-emoji-text emoji) "🤔"))))
+
 (provide 'jirassic-adf-parser-test)
 ;;; jirassic-adf-parser-test.el ends here
