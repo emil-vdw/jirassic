@@ -37,6 +37,7 @@
 
 MARKS is a list of JIRA-MARK objects."
   text marks)
+(cl-defstruct jira-emoji text)
 (cl-defstruct jira-mark
   "A mark that describes a text modifier.
 

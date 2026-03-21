@@ -10,22 +10,27 @@
 
 (require 'jirassic-jira)
 
-(defvar level-indent (* level 2)
+(defvar level-indent 2
   "Number of whitespace characters of indentation per level.")
 
 (defvar jirassic-serializer--supported-marks
   '(code em link strike strong subsup underline)
   "The type of text marks supported by `jirassic--serialize-to-org'.")
 
-(cl-defgeneric jirassic--serialize-to-org (obj level)
-  "Serialize OBJ to an org-mode string at heading LEVEL.")
+(cl-defgeneric jirassic--serialize-to-org (obj &optional level)
+  "Serialize OBJ to an `org-mode' string at heading LEVEL.")
+
+(cl-defmethod jirassic--serialize-to-org :around (obj &optional level)
+  "Default level to 0."
+  (cl-call-next-method obj (or level 0)))
 
 (defun jirassic--string-repeat (num s)
   "Repeat string S NUM times."
+  (declare (pure t) (side-effect-free t))
   (apply #'concat (make-list num s)))
 
-;;; `jira-heading' serialiser
-(cl-defmethod jirassic--serialize-to-org ((obj jira-heading) level)
+;;; `jira-heading' serializer
+(cl-defmethod jirassic--serialize-to-org ((obj jira-heading) &optional level)
   "Convert a Jira heading OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   (let ((stars (jira-heading-level obj)))
@@ -35,8 +40,8 @@
                          (jirassic--serialize-to-org heading-part level))
                        (jira-heading-content obj)))))
 
-;;; `jira-text' serialiser
-(cl-defmethod jirassic--serialize-to-org ((obj jira-text) level)
+;;; `jira-text' serializer
+(cl-defmethod jirassic--serialize-to-org ((obj jira-text) &optional level)
   "Return the text of a Jira text OBJ at LEVEL.
 
 Only applies the first supported mark because of org syntax limitations."
@@ -55,7 +60,7 @@ Only applies the first supported mark because of org syntax limitations."
         (cl-destructuring-bind (leading-space center-text trailing-space)
             (jirassic-serializer--split-whitespace full-text)
           (concat
-           ;; Put the leading space back.
+           ;; Put the leading spaces back.
            leading-space
            ;; Format the center text.
            (pcase (jira-mark-type mark)
@@ -71,9 +76,21 @@ Only applies the first supported mark because of org syntax limitations."
                           center-text))
              ('link      (format "[[%s][%s]]" (alist-get 'href (jira-mark-attrs mark)) center-text))
              (type (warn "Unsupported Jira text mark %s" type)))
-           ;; Put the trailing space back.
+           ;; Put the trailing spaces back.
            trailing-space))
       full-text)))
+
+;;; `jira-rule' serializer
+(cl-defmethod jirassic--serialize-to-org ((obj jira-rule) &optional level)
+  "Convert a Jira heading OBJ to an org mode string at LEVEL."
+  (declare (pure t) (side-effect-free t))
+  "-----")
+
+;;; `jira-emoji' serializer
+(cl-defmethod jirassic--serialize-to-org ((obj jira-rule) &optional level)
+  "Convert a Jira heading OBJ to an org mode string at LEVEL."
+  (declare (pure t) (side-effect-free t))
+  (jira-emoji-text obj))
 
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.
@@ -84,6 +101,7 @@ string and trailing whitespace characters.
 Example:
   (jirassic-serializer--split-whitespace \"  some string \")
   => '(\"  \" \"some string\" \" \")"
+  (declare (pure t) (side-effect-free t))
   (string-match "\\`\\(\\s-*\\)\\(.*?\\)\\(\\s-*\\)\\'" string)
   (list (match-string 1 string)
         (match-string 2 string)
