@@ -58,6 +58,8 @@ Possible values for TYPE:
 
 ;;; Lists
 (cl-defstruct jira-bullet-list content)
+(cl-defstruct jira-ordered-list content)
+(cl-defstruct jira-list-item content)
 
 
 (provide 'jirassic-jira)

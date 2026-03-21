@@ -16,7 +16,13 @@
   (let-alist node
     (pcase .type
       ("heading" (jirassic--parse-heading node))
-      ("text" (jirassic--parse-text node)))))
+      ("text" (jirassic--parse-text node))
+      ("rule" (make-jira-rule))
+      ("emoji" (make-jira-emoji :text .text))
+      ("bulletList" (make-jira-emoji :content (jirassic--parse-content .content)))
+      ("orderedList" (make-jira-ordered-list :content (jirassic--parse-content .content)))
+      ("listItem" (make-jira-list-item :content (jirassic--parse-content .content)))
+      (_ (warn "Unsupported ADF node type %s" .type)))))
 
 (defun jirassic--parse-content (content)
   "Parse all ADF nodes in CONTENT to a list of Jira objects."
