@@ -29,7 +29,7 @@
   (declare (pure t) (side-effect-free t))
   (apply #'concat (make-list num s)))
 
-;;; `jira-heading' serializer
+;;; `jira-heading'
 (cl-defmethod jirassic--serialize-to-org ((obj jira-heading) &optional level)
   "Convert a Jira heading OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
@@ -40,7 +40,7 @@
                          (jirassic--serialize-to-org heading-part level))
                        (jira-heading-content obj)))))
 
-;;; `jira-text' serializer
+;;; `jira-text'
 (cl-defmethod jirassic--serialize-to-org ((obj jira-text) &optional level)
   "Return the text of a Jira text OBJ at LEVEL.
 
@@ -80,17 +80,28 @@ Only applies the first supported mark because of org syntax limitations."
            trailing-space))
       full-text)))
 
-;;; `jira-rule' serializer
+;;; `jira-rule'
 (cl-defmethod jirassic--serialize-to-org ((obj jira-rule) &optional level)
   "Convert a Jira heading OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   "-----")
 
-;;; `jira-emoji' serializer
-(cl-defmethod jirassic--serialize-to-org ((obj jira-rule) &optional level)
-  "Convert a Jira heading OBJ to an org mode string at LEVEL."
+;;; `jira-emoji'
+(cl-defmethod jirassic--serialize-to-org ((obj jira-emoji) &optional level)
+  "Convert a Jira emoji OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   (jira-emoji-text obj))
+
+;;; `jira-bullet-list'
+(cl-defmethod jirassic--serialize-to-org ((obj jira-bullet-list) &optional level)
+  "Convert a Jira bullet list OBJ to an org mode string at LEVEL."
+  (declare (pure t) (side-effect-free t))
+  (mapconcat (lambda (list-item-text) (format "- %s" list-item-text))
+             ;; Serialize the content of each `jira-list-item' into an org string
+             (mapcar (lambda (list-item)
+                       (jirassic--serialize-to-org (jira-list-item-content list-item)))
+                     (jira-bullet-list-content obj))
+             "\n"))
 
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.

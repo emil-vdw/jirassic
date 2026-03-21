@@ -58,6 +58,17 @@
             (make-jira-text :text "  space "))
            "  space ")))
 
+(ert-deftest jirassic-serializer-test-bullet-list ()
+  (let ((bullet-list (make-jira-bullet-list
+                      :content (list (make-jira-list-item
+                                      :content (make-jira-text :text "first bullet"))
+                                     (make-jira-list-item
+                                      :content (make-jira-text :text "second bullet"))
+                                     (make-jira-list-item
+                                      :content (make-jira-text :text "third bullet"))))))
+    (should (string= (jirassic--serialize-to-org bullet-list)
+                     "- first bullet\n- second bullet\n- third bullet"))))
+
 
 
 (provide 'jirassic-org-serializer-test)
