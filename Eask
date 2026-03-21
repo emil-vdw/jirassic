@@ -17,7 +17,7 @@
 (files
  "jirassic.el"
  "jirassic-client.el"
- "jirassic-jira.el"
+ "jirassic-adf.el"
  "jirassic-adf-parser.el"
  "jirassic-serializer.el")
 

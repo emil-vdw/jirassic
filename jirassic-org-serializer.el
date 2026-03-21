@@ -1,4 +1,4 @@
-;;; jirassic-org-serializer.el --- Serialize Jira objects into Org strings -*- lexical-binding: t; -*-
+;;; jirassic-org-serializer.el --- Serialize ADF objects into Org strings -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Emil van der Westhuizen
 ;; Author: Emil van der Westhuizen <vdwemil@protonmail.com>
@@ -8,7 +8,7 @@
 ;;; Code:
 (require 'cl-lib)
 
-(require 'jirassic-jira)
+(require 'jirassic-adf)
 
 (defvar level-indent 2
   "Number of whitespace characters of indentation per level.")
@@ -29,29 +29,29 @@
   (declare (pure t) (side-effect-free t))
   (apply #'concat (make-list num s)))
 
-;;; `jira-heading'
-(cl-defmethod jirassic--serialize-to-org ((obj jira-heading) &optional level)
-  "Convert a Jira heading OBJ to an org mode string at LEVEL."
+;;; `adf-heading'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-heading) &optional level)
+  "Convert an ADF heading OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
-  (let ((stars (jira-heading-level obj)))
+  (let ((stars (adf-heading-level obj)))
     (format "%s %s"
             (jirassic--string-repeat stars "*")
             (mapconcat (lambda (heading-part)
                          (jirassic--serialize-to-org heading-part level))
-                       (jira-heading-content obj)))))
+                       (adf-heading-content obj)))))
 
-;;; `jira-text'
-(cl-defmethod jirassic--serialize-to-org ((obj jira-text) &optional level)
-  "Return the text of a Jira text OBJ at LEVEL.
+;;; `adf-text'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-text) &optional level)
+  "Return the text of an ADF text OBJ at LEVEL.
 
 Only applies the first supported mark because of org syntax limitations."
   (declare (pure t) (side-effect-free t))
   (let (;; Get the first mark that is supported by the serializer (if any).
         (mark (car (seq-filter
-                    (lambda (mark) (member (jira-mark-type mark)
+                    (lambda (mark) (member (adf-mark-type mark)
                                            jirassic-serializer--supported-marks))
-                    (jira-text-marks obj))))
-        (full-text (jira-text-text obj)))
+                    (adf-text-marks obj))))
+        (full-text (adf-text-text obj)))
     (if mark
         ;; The text we need to format w.r.t. the given mark may start or end
         ;; with some whitespace, e.g. " string ". Since org-mode syntax for these
@@ -63,44 +63,44 @@ Only applies the first supported mark because of org syntax limitations."
            ;; Put the leading spaces back.
            leading-space
            ;; Format the center text.
-           (pcase (jira-mark-type mark)
+           (pcase (adf-mark-type mark)
              ('code      (format "~%s~" center-text))
              ('em        (format "/%s/" center-text))
              ('strike    (format "+%s+" center-text))
              ('strong    (format "*%s*" center-text))
              ('underline (format "_%s_" center-text))
              ('subsup    (format
-                          (if (string= (alist-get 'attrs (jira-mark-attrs mark)) "sub")
+                          (if (string= (alist-get 'attrs (adf-mark-attrs mark)) "sub")
                               "_{%s}"   ; subscript
                             "^{%s}")    ;superscript
                           center-text))
-             ('link      (format "[[%s][%s]]" (alist-get 'href (jira-mark-attrs mark)) center-text))
-             (type (warn "Unsupported Jira text mark %s" type)))
+             ('link      (format "[[%s][%s]]" (alist-get 'href (adf-mark-attrs mark)) center-text))
+             (type (warn "Unsupported ADF text mark %s" type)))
            ;; Put the trailing spaces back.
            trailing-space))
       full-text)))
 
-;;; `jira-rule'
-(cl-defmethod jirassic--serialize-to-org ((obj jira-rule) &optional level)
-  "Convert a Jira heading OBJ to an org mode string at LEVEL."
+;;; `adf-rule'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-rule) &optional level)
+  "Convert an ADF rule OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   "-----")
 
-;;; `jira-emoji'
-(cl-defmethod jirassic--serialize-to-org ((obj jira-emoji) &optional level)
-  "Convert a Jira emoji OBJ to an org mode string at LEVEL."
+;;; `adf-emoji'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-emoji) &optional level)
+  "Convert an ADF emoji OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
-  (jira-emoji-text obj))
+  (adf-emoji-text obj))
 
-;;; `jira-bullet-list'
-(cl-defmethod jirassic--serialize-to-org ((obj jira-bullet-list) &optional level)
-  "Convert a Jira bullet list OBJ to an org mode string at LEVEL."
+;;; `adf-bullet-list'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-bullet-list) &optional level)
+  "Convert an ADF bullet list OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   (mapconcat (lambda (list-item-text) (format "- %s" list-item-text))
-             ;; Serialize the content of each `jira-list-item' into an org string
+             ;; Serialize the content of each `adf-list-item' into an org string
              (mapcar (lambda (list-item)
-                       (jirassic--serialize-to-org (jira-list-item-content list-item)))
-                     (jira-bullet-list-content obj))
+                       (jirassic--serialize-to-org (adf-list-item-content list-item)))
+                     (adf-bullet-list-content obj))
              "\n"))
 
 (defun jirassic-serializer--split-whitespace (string)

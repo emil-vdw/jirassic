@@ -8,10 +8,10 @@
 (require 'jirassic-adf-parser)
 
 (defun jirassic-test--marks-equal (m1 m2)
-  "Return t if `jira-mark' M1 is has identical values to M2."
-  (and (cl-typep m1 'jira-mark) (cl-typep m2 'jira-mark)
-       (eq (jira-mark-type m1) (jira-mark-type m2))
-       (equal (jira-mark-attrs m1) (jira-mark-attrs m2))))
+  "Return t if `adf-mark' M1 is has identical values to M2."
+  (and (cl-typep m1 'adf-mark) (cl-typep m2 'adf-mark)
+       (eq (adf-mark-type m1) (adf-mark-type m2))
+       (equal (adf-mark-attrs m1) (adf-mark-attrs m2))))
 
 (ert-deftest jirassic-parser-test-parse-simple-text ()
   "Test that text without marks is parsed correctly."
@@ -20,9 +20,9 @@
           '((type . "text")
             (text
              . "Monthly Wrap Email initiative doc")))))
-    (should (string= (jira-text-text parsed-text)
+    (should (string= (adf-text-text parsed-text)
                      "Monthly Wrap Email initiative doc"))
-    (should (eq (jira-text-marks parsed-text) nil))))
+    (should (eq (adf-text-marks parsed-text) nil))))
 
 (ert-deftest jirassic-parser-test-parse-with-marks ()
   "Test that text with marks is parsed correctly."
@@ -43,37 +43,37 @@
                 ((type . "subsup") (attrs . ((type . "sub"))))
                 ((type . "textColor"))
                 ((type . "underline"))])))))
-    (should (string= (jira-text-text parsed-text)
+    (should (string= (adf-text-text parsed-text)
                      "Monthly Wrap Email initiative doc"))
-    (let ((marks (jira-text-marks parsed-text)))
+    (let ((marks (adf-text-marks parsed-text)))
       ;; backgroundColor
       (should (jirassic-test--marks-equal
-               (nth 0 marks) (make-jira-mark :type 'backgroundColor)))
+               (nth 0 marks) (make-adf-mark :type 'backgroundColor)))
       ;; code
       (should (jirassic-test--marks-equal
-               (nth 1 marks) (make-jira-mark :type 'code)))
+               (nth 1 marks) (make-adf-mark :type 'code)))
       ;; em
       (should (jirassic-test--marks-equal
-               (nth 2 marks) (make-jira-mark :type 'em)))
+               (nth 2 marks) (make-adf-mark :type 'em)))
       ;; link
       (should (jirassic-test--marks-equal
-               (nth 3 marks) (make-jira-mark  :type 'link
+               (nth 3 marks) (make-adf-mark  :type 'link
                                               :attrs '((href . "https://acme.com")))))
       ;; strike
       (should (jirassic-test--marks-equal
-               (nth 4 marks) (make-jira-mark :type 'strike)))
+               (nth 4 marks) (make-adf-mark :type 'strike)))
       ;; strong
       (should (jirassic-test--marks-equal
-               (nth 5 marks) (make-jira-mark :type 'strong)))
+               (nth 5 marks) (make-adf-mark :type 'strong)))
       ;; subsup
       (should (jirassic-test--marks-equal
-               (nth 6 marks) (make-jira-mark :type 'subsup :attrs '((type . "sub")))))
+               (nth 6 marks) (make-adf-mark :type 'subsup :attrs '((type . "sub")))))
       ;; textColor
       (should (jirassic-test--marks-equal
-               (nth 7 marks) (make-jira-mark :type 'textColor)))
+               (nth 7 marks) (make-adf-mark :type 'textColor)))
       ;; underline
       (should (jirassic-test--marks-equal
-               (nth 8 marks) (make-jira-mark :type 'underline))))))
+               (nth 8 marks) (make-adf-mark :type 'underline))))))
 
 (provide 'jirassic-adf-parser-test)
 ;;; jirassic-adf-parser-test.el ends here

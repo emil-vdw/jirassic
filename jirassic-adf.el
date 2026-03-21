@@ -1,4 +1,4 @@
-;;; jirassic-issue.el --- Jira issue definitions -*- lexical-binding: t; -*-
+;;; jirassic-adf.el --- Atlassian Document Format definitions -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Emil van der Westhuizen
 ;; Author: Emil van der Westhuizen <vdwemil@protonmail.com>
@@ -23,22 +23,22 @@
 ;;; Code:
 (require 'cl-lib)
 
-(cl-defstruct jira-issue id key description)
+(cl-defstruct adf-issue id key description)
 
-(cl-defstruct jira-doc content)
-(cl-defstruct jira-heading content level)
-(cl-defstruct jira-paragraph
-  "A text paragraph that has a list of Jira objects as CONTENT."
+(cl-defstruct adf-doc content)
+(cl-defstruct adf-heading content level)
+(cl-defstruct adf-paragraph
+  "A text paragraph that has a list of ADF objects as CONTENT."
   content)
-(cl-defstruct jira-rule
+(cl-defstruct adf-rule
   "A horizontal rule.")
-(cl-defstruct jira-text
-  "Jira text object that may have MARKS applied.
+(cl-defstruct adf-text
+  "ADF text object that may have MARKS applied.
 
-MARKS is a list of JIRA-MARK objects."
+MARKS is a list of ADF-MARK objects."
   text marks)
-(cl-defstruct jira-emoji text)
-(cl-defstruct jira-mark
+(cl-defstruct adf-emoji text)
+(cl-defstruct adf-mark
   "A mark that describes a text modifier.
 
 Possible values for TYPE:
@@ -57,10 +57,10 @@ Possible values for TYPE:
   type attrs)
 
 ;;; Lists
-(cl-defstruct jira-bullet-list content)
-(cl-defstruct jira-ordered-list content)
-(cl-defstruct jira-list-item content)
+(cl-defstruct adf-bullet-list content)
+(cl-defstruct adf-ordered-list content)
+(cl-defstruct adf-list-item content)
 
 
-(provide 'jirassic-jira)
-;;; jirassic-issue.el ends here
+(provide 'jirassic-adf)
+;;; jirassic-adf.el ends here
