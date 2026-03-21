@@ -48,32 +48,32 @@
     (let ((marks (jira-text-marks parsed-text)))
       ;; backgroundColor
       (should (jirassic-test--marks-equal
-               (nth 0 marks) (make-jira-mark :type 'backgroundColor :attrs nil)))
+               (nth 0 marks) (make-jira-mark :type 'backgroundColor)))
       ;; code
       (should (jirassic-test--marks-equal
-               (nth 1 marks) (make-jira-mark :type 'code :attrs nil)))
+               (nth 1 marks) (make-jira-mark :type 'code)))
       ;; em
       (should (jirassic-test--marks-equal
-               (nth 2 marks) (make-jira-mark :type 'em :attrs nil)))
+               (nth 2 marks) (make-jira-mark :type 'em)))
       ;; link
       (should (jirassic-test--marks-equal
                (nth 3 marks) (make-jira-mark  :type 'link
                                               :attrs '((href . "https://acme.com")))))
       ;; strike
       (should (jirassic-test--marks-equal
-               (nth 4 marks) (make-jira-mark :type 'strike :attrs nil)))
+               (nth 4 marks) (make-jira-mark :type 'strike)))
       ;; strong
       (should (jirassic-test--marks-equal
-               (nth 5 marks) (make-jira-mark :type 'strong :attrs nil)))
+               (nth 5 marks) (make-jira-mark :type 'strong)))
       ;; subsup
       (should (jirassic-test--marks-equal
                (nth 6 marks) (make-jira-mark :type 'subsup :attrs '((type . "sub")))))
       ;; textColor
       (should (jirassic-test--marks-equal
-               (nth 7 marks) (make-jira-mark :type 'textColor :attrs nil)))
+               (nth 7 marks) (make-jira-mark :type 'textColor)))
       ;; underline
       (should (jirassic-test--marks-equal
-               (nth 8 marks) (make-jira-mark :type 'underline :attrs nil))))))
+               (nth 8 marks) (make-jira-mark :type 'underline))))))
 
 (provide 'jirassic-adf-parser-test)
 ;;; jirassic-adf-parser-test.el ends here

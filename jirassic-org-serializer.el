@@ -46,22 +46,48 @@ Only applies the first supported mark because of org syntax limitations."
                     (lambda (mark) (member (jira-mark-type mark)
                                            jirassic-serializer--supported-marks))
                     (jira-text-marks obj))))
-        (text (jira-text-text obj)))
+        (full-text (jira-text-text obj)))
     (if mark
-        (pcase (jira-mark-type mark)
-          ('code      (format "~%s~" text))
-          ('em        (format "/%s/" text))
-          ('strike    (format "+%s+" text))
-          ('strong    (format "*%s*" text))
-          ('underline (format "_%s_" text))
-          ('subsup    (format
-                       (if (string= (alist-get 'attrs (jira-mark-attrs mark)) "sub")
-                           "_{%s}"    ; subscript
-                         "^{%s}")    ;superscript
-                       text))
-          ('link      (format "[[%s][%s]]" (alist-get 'href (jira-mark-attrs mark)) text))
-          (type (warn "Unsupported Jira text mark %s" type)))
-      text)))
+        ;; The text we need to format w.r.t. the given mark may start or end
+        ;; with some whitespace, e.g. " string ". Since org-mode syntax for these
+        ;; emphasis markers, we take out only the center text, apply the formatting
+        ;; and then put the leading and trailing whitespace back.
+        (cl-destructuring-bind (leading-space center-text trailing-space)
+            (jirassic-serializer--split-whitespace full-text)
+          (concat
+           ;; Put the leading space back.
+           leading-space
+           ;; Format the center text.
+           (pcase (jira-mark-type mark)
+             ('code      (format "~%s~" center-text))
+             ('em        (format "/%s/" center-text))
+             ('strike    (format "+%s+" center-text))
+             ('strong    (format "*%s*" center-text))
+             ('underline (format "_%s_" center-text))
+             ('subsup    (format
+                          (if (string= (alist-get 'attrs (jira-mark-attrs mark)) "sub")
+                              "_{%s}"   ; subscript
+                            "^{%s}")    ;superscript
+                          center-text))
+             ('link      (format "[[%s][%s]]" (alist-get 'href (jira-mark-attrs mark)) center-text))
+             (type (warn "Unsupported Jira text mark %s" type)))
+           ;; Put the trailing space back.
+           trailing-space))
+      full-text)))
+
+(defun jirassic-serializer--split-whitespace (string)
+  "Split STRING in leading whitespace, center string and trailing spaces.
+
+Returns a three element list containing the leading whitespace, center
+string and trailing whitespace characters.
+
+Example:
+  (jirassic-serializer--split-whitespace \"  some string \")
+  => '(\"  \" \"some string\" \" \")"
+  (string-match "\\`\\(\\s-*\\)\\(.*?\\)\\(\\s-*\\)\\'" string)
+  (list (match-string 1 string)
+        (match-string 2 string)
+        (match-string 3 string)))
 
 (provide 'jirassic-org-serializer)
 ;;; jirassic-org-serializer.el ends here
