@@ -120,6 +120,13 @@
                     (make-adf-code-block
                      :language ""
                      :content (list (make-adf-text :text "hello"))))
+                   "#+BEGIN_SRC\nhello\n#+END_SRC\n"))
+
+  ;; Language "none"
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-code-block
+                     :language "none"
+                     :content (list (make-adf-text :text "hello"))))
                    "#+BEGIN_SRC\nhello\n#+END_SRC\n")))
 ;;; fallback serializer
 (cl-defstruct jirassic-test--unsupported-node)

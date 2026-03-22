@@ -146,7 +146,10 @@ Formats to a date without time components."
         (content (adf-code-block-content obj)))
     (concat
      "#+BEGIN_SRC"
-     (when (and language (not (string-empty-p language)))
+     (when (and language
+                (not (string-empty-p language))
+                ;; "none" is also an option in Jira and we want to ignore it.
+                (not (string= language "none")))
        (format " %s" language))
      "\n"
      (mapconcat #'jirassic--serialize-to-org content)
