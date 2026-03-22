@@ -1,11 +1,11 @@
-;;; jirassic-adf-parser-test.el --- Tests for jirassic-parser -*- lexical-binding: t -*-
+;;; jirassic-jira-parser-test.el --- Tests for jirassic-jira-parser -*- lexical-binding: t -*-
 
 ;;; Commentary:
 
 ;;; Code:
 (require 'ert)
 
-(require 'jirassic-adf-parser)
+(require 'jirassic-jira-parser)
 
 (defun jirassic-test--marks-equal (m1 m2)
   "Return t if `adf-mark' M1 is has identical values to M2."
@@ -137,5 +137,5 @@
     (should (string= (adf-text-text (car (adf-paragraph-content (nth 1 content))))
                      "multiline quote"))))
 
-(provide 'jirassic-adf-parser-test)
-;;; jirassic-adf-parser-test.el ends here
+(provide 'jirassic-jira-parser-test)
+;;; jirassic-jira-parser-test.el ends here

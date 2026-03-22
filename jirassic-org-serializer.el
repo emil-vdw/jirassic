@@ -8,7 +8,7 @@
 ;;; Code:
 (require 'cl-lib)
 
-(require 'jirassic-adf)
+(require 'jirassic-jira)
 
 (defvar level-indent 2
   "Number of whitespace characters of indentation per level.")

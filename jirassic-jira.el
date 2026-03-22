@@ -1,4 +1,4 @@
-;;; jirassic-adf.el --- Atlassian Document Format definitions -*- lexical-binding: t; -*-
+;;; jirassic-jira.el --- Atlassian Document Format definitions -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Emil van der Westhuizen
 ;; Author: Emil van der Westhuizen <vdwemil@protonmail.com>
@@ -23,7 +23,7 @@
 ;;; Code:
 (require 'cl-lib)
 
-(cl-defstruct adf-issue id key description)
+(cl-defstruct jira-issue id key description)
 
 (cl-defstruct adf-doc content)
 
@@ -167,5 +167,5 @@ CONTENT must contain one or more media nodes."
 (cl-defstruct adf-list-item content)
 
 
-(provide 'jirassic-adf)
-;;; jirassic-adf.el ends here
+(provide 'jirassic-jira)
+;;; jirassic-jira.el ends here

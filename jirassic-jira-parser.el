@@ -1,4 +1,4 @@
-;;; jirassic-adf-parser.el --- Parses ADF alists into ADF objects -*- lexical-binding: t; -*-
+;;; jirassic-jira-parser.el --- Parses ADF alists into ADF objects -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Emil van der Westhuizen
 ;; Author: Emil van der Westhuizen <vdwemil@protonmail.com>
@@ -8,7 +8,7 @@
 ;; Parses ADF structs to org format.
 
 ;;; Code:
-(require 'jirassic-adf)
+(require 'jirassic-jira)
 
 (defun jirassic-parse-adf-node (node)
   "Convert an alist of data for a Jira ADF NODE into its corresponding object."
@@ -123,5 +123,5 @@ See the definition of `adf-code-block' for the constraints of
   (let-alist blockquote
     (make-adf-blockquote :content (jirassic--parse-content .content))))
 
-(provide 'jirassic-adf-parser)
-;;; jirassic-adf-parser.el ends here
+(provide 'jirassic-jira-parser)
+;;; jirassic-jira-parser.el ends here
