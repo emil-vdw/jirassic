@@ -29,6 +29,16 @@
   (declare (pure t) (side-effect-free t))
   (apply #'concat (make-list num s)))
 
+;;; Default serializer when there isn't one specific to the node type.
+(cl-defmethod jirassic--serialize-to-org ((obj t) &optional _level)
+  "Warn the user and return a placeholder of unsupported node OBJ."
+  ;; This is a fallback serializer that is only meant to be dispatched
+  ;; when no specific serializer is defined for the given node type.
+  (declare (pure t) (side-effect-free t))
+  (let ((node-type (cl-type-of obj)))
+    (warn "Jirassic serializer doesn't support serializing %s" node-type)
+    (format "###unsupported ADF node: %s###" node-type)))
+
 ;;; `adf-heading'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-heading) &optional level)
   "Convert an ADF heading OBJ to an org mode string at LEVEL."
@@ -41,7 +51,7 @@
                        (adf-heading-content obj)))))
 
 ;;; `adf-text'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-text) &optional level)
+(cl-defmethod jirassic--serialize-to-org ((obj adf-text) &optional _level)
   "Return the text of an ADF text OBJ, LEVEL is ignored.
 
 LEVEL is ignored because `adf-text' is an inline node, so only its
@@ -84,13 +94,13 @@ Only applies the first supported mark because of org syntax limitations."
       full-text)))
 
 ;;; `adf-rule'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-rule) &optional level)
+(cl-defmethod jirassic--serialize-to-org ((obj adf-rule) &optional _level)
   "Convert an ADF rule OBJ to an org mode string, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
   "-----")
 
 ;;; `adf-emoji'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-emoji) &optional level)
+(cl-defmethod jirassic--serialize-to-org ((obj adf-emoji) &optional _level)
   "Convert an `adf-emoji' OBJ to an org mode string, LEVEL is ignored.
 
 LEVEL is ignored because `adf-emoji' is an inline node, so only its
@@ -111,7 +121,7 @@ parent container will consider indentation."
              "\n"))
 
 ;;; `adf-date'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-date) &optional level)
+(cl-defmethod jirassic--serialize-to-org ((obj adf-date) &optional _level)
   "Serialize the `adf-date-timestamp' of OBJ to an org timestamp, LEVEL is ignored.
 
 LEVEL is ignored because `adf-date' is an inline node, so only its
@@ -123,13 +133,13 @@ Formats to a date without time components."
                       (seconds-to-time (string-to-number (adf-date-timestamp obj)))))
 
 ;;; `adf-hard-break'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-hard-break) &optional level)
+(cl-defmethod jirassic--serialize-to-org ((obj adf-hard-break) &optional _level)
   "Serialize an `adf-hard-break' OBJ as a newline character, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
   "\n")
 
 ;;; `adf-code-block'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-code-block) &optional level)
+(cl-defmethod jirassic--serialize-to-org ((obj adf-code-block) &optional _level)
   "Serialize an `adf-code-block' OBJ as an org source block, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
   (let ((language (adf-code-block-language obj))

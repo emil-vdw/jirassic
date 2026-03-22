@@ -11,7 +11,7 @@
 (require 'jirassic-adf)
 
 (defun jirassic-parse-adf-node (node)
-  ""
+  "Convert an alist of data for a Jira ADF NODE into its corresponding object."
   (declare (pure t) (side-effect-free t))
   (let-alist node
     (pcase .type
@@ -27,7 +27,12 @@
 (defun jirassic--parse-content (content)
   "Parse all ADF nodes in CONTENT to a list of Jira objects."
   (declare (pure t) (side-effect-free t))
-  (mapcar #'jirassic-parse-adf-node content))
+  (seq-remove
+   ;; Remove all occurrences of `nil'. This happens when parsing an
+   ;; unsupported node type, which we will warn the user about,
+   ;; continue with what we support.
+   #'null
+   (mapcar #'jirassic-parse-adf-node content)))
 
 (defun jirassic--parse-heading (heading)
   "Create an ADF-HEADING object from a HEADING ADF node."

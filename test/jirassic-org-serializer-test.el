@@ -73,14 +73,15 @@
 
 ;;; `adf-date'
 (ert-deftest jirassic-serializer-test-date ()
-  (should (string= (jirassic--serialize-to-org
-                    (make-adf-date :timestamp "1582152559"))
-                   "<2020-02-19 Wed>"))
+  (let ((system-time-locale "en_GB.UTF-8"))
+    (should (string= (jirassic--serialize-to-org
+                      (make-adf-date :timestamp "1582152559"))
+                     "<2020-02-19 Wed>"))
 
-  ;; Test the empty string case since the API doesn't gaurentee a non-empty string.
-  (should (string= (jirassic--serialize-to-org
-                    (make-adf-date :timestamp ""))
-                   "<1970-01-01 Thu>")))
+    ;; Test the empty string case since the API doesn't gaurentee a non-empty string.
+    (should (string= (jirassic--serialize-to-org
+                      (make-adf-date :timestamp ""))
+                     "<1970-01-01 Thu>"))))
 
 ;;; `adf-hard-break'
 (ert-deftest jirassic-serializer-test-hard-break ()
@@ -120,7 +121,12 @@
                      :language ""
                      :content (list (make-adf-text :text "hello"))))
                    "#+BEGIN_SRC\nhello\n#+END_SRC\n")))
+;;; fallback serializer
+(cl-defstruct jirassic-test--unsupported-node)
 
+(ert-deftest jirassic-serializer-test-fallback ()
+  (should (string= (jirassic--serialize-to-org (make-jirassic-test--unsupported-node))
+                   "###unsupported ADF node: jirassic-test--unsupported-node###")))
 
 (provide 'jirassic-org-serializer-test)
 ;;; jirassic-org-serializer-test.el ends here
