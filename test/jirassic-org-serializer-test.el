@@ -7,6 +7,7 @@
 
 (require 'jirassic-org-serializer)
 
+;;; `adf-text'
 (ert-deftest jirassic-serializer-test-text-code ()
   (let ((link (make-adf-text
                :text "Order 66"
@@ -58,6 +59,7 @@
             (make-adf-text :text "  space "))
            "  space ")))
 
+;;; `adf-bullet-list'
 (ert-deftest jirassic-serializer-test-bullet-list ()
   (let ((bullet-list (make-adf-bullet-list
                       :content (list (make-adf-list-item
@@ -69,6 +71,7 @@
     (should (string= (jirassic--serialize-to-org bullet-list)
                      "- first bullet\n- second bullet\n- third bullet"))))
 
+;;; `adf-date'
 (ert-deftest jirassic-serializer-test-date ()
   (should (string= (jirassic--serialize-to-org
                     (make-adf-date :timestamp "1582152559"))
@@ -79,13 +82,44 @@
                     (make-adf-date :timestamp ""))
                    "<1970-01-01 Thu>")))
 
+;;; `adf-hard-break'
 (ert-deftest jirassic-serializer-test-hard-break ()
   (should (string= (jirassic--serialize-to-org (make-adf-hard-break))
                    "\n")))
 
+;;; `adf-rule'
 (ert-deftest jirassic-serializer-test-rule ()
   (should (string= (jirassic--serialize-to-org (make-adf-rule))
                    "-----")))
+
+;;; `adf-emoji'
+(ert-deftest jirassic-serializer-test-emoji ()
+  (should (string= (jirassic--serialize-to-org (make-adf-emoji :text ":smile:"))
+                   ":smile:")))
+
+;;; `adf-code-block'
+(ert-deftest jirassic-serializer-test-code-block ()
+  ;; With language
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-code-block
+                     :language "python"
+                     :content (list
+                               (make-adf-text :text
+                                              "class Foo:\n    x: int = 5\n\nf = Foo()"))))
+                   "#+BEGIN_SRC python\nclass Foo:\n    x: int = 5\n\nf = Foo()\n#+END_SRC\n"))
+
+  ;; Without language
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-code-block
+                     :content (list (make-adf-text :text "hello"))))
+                   "#+BEGIN_SRC\nhello\n#+END_SRC\n"))
+
+  ;; Empty string language treated as omitted
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-code-block
+                     :language ""
+                     :content (list (make-adf-text :text "hello"))))
+                   "#+BEGIN_SRC\nhello\n#+END_SRC\n")))
 
 
 (provide 'jirassic-org-serializer-test)

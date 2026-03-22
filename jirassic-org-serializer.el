@@ -128,6 +128,20 @@ Formats to a date without time components."
   (declare (pure t) (side-effect-free t))
   "\n")
 
+;;; `adf-code-block'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-code-block) &optional level)
+  "Serialize an `adf-code-block' OBJ as an org source block, LEVEL is ignored."
+  (declare (pure t) (side-effect-free t))
+  (let ((language (adf-code-block-language obj))
+        (content (adf-code-block-content obj)))
+    (concat
+     "#+BEGIN_SRC"
+     (when (and language (not (string-empty-p language)))
+       (format " %s" language))
+     "\n"
+     (mapconcat #'jirassic--serialize-to-org content)
+     "\n#+END_SRC\n")))
+
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.
 

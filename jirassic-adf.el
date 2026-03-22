@@ -120,8 +120,9 @@ TEXT contains the emoji to display"
 (cl-defstruct adf-code-block
   "A container of lines of code.
 
-CONTENT takes an array of one or more `adf-text' objects without marks."
-  content)
+CONTENT takes an array of one or more `adf-text' objects without marks.
+LANGUAGE may be provided as a string, e.g. \"python\"."
+  content language)
 
 (cl-defstruct adf-blockquote
   "A container for quotes.
