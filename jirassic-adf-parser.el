@@ -17,6 +17,7 @@
     (pcase .type
       ("heading" (jirassic--parse-heading node))
       ("text" (jirassic--parse-text node))
+      ("codeBlock" (jirassic--parse-code-block node))
       ("rule" (make-adf-rule))
       ("emoji" (make-adf-emoji :text .attrs.text))
       ("bulletList" (make-adf-emoji :content (jirassic--parse-content .content)))
@@ -35,7 +36,7 @@
    (mapcar #'jirassic-parse-adf-node content)))
 
 (defun jirassic--parse-heading (heading)
-  "Create an ADF-HEADING object from a HEADING ADF node."
+  "Create an `adf-heading' object from a HEADING ADF node."
   ;; Example ADF alist:
   ;; ((type . "heading") (attrs (level . 2))
   ;;  (content
@@ -63,6 +64,24 @@
                                (make-adf-mark :type (intern (alist-get 'type mark))
                                               :attrs (alist-get 'attrs mark)))
                              .marks)))))
+
+(defun jirassic--parse-code-block (code-block)
+  "Create an `adf-code-block' object from a CODE-BLOCK node.
+
+See the definition of `adf-code-block' for the constraints of
+`adf-code-block-content'."
+  ;; Example code block:
+  ;; ((type . "codeBlock")
+  ;;  (attrs (language . "python"))
+  ;;  (content
+  ;;   . [((type . "text")
+  ;;       (text
+  ;;        . "class Foo:\n    x: int = 5\n\nf = Foo()"))]))
+  (declare (pure t) (side-effect-free t))
+  (let-alist code-block
+    (make-adf-code-block
+     :content (jirassic--parse-content .content)
+     :language .attrs.language)))
 
 (provide 'jirassic-adf-parser)
 ;;; jirassic-adf-parser.el ends here
