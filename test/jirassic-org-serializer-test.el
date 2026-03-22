@@ -83,6 +83,10 @@
   (should (string= (jirassic--serialize-to-org (make-adf-hard-break))
                    "\n")))
 
+(ert-deftest jirassic-serializer-test-rule ()
+  (should (string= (jirassic--serialize-to-org (make-adf-rule))
+                   "-----")))
+
 
 (provide 'jirassic-org-serializer-test)
 ;;; jirassic-org-serializer-test.el ends here
