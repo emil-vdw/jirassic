@@ -19,10 +19,23 @@
       ("text" (jirassic--parse-text node))
       ("codeBlock" (jirassic--parse-code-block node))
       ("rule" (make-adf-rule))
+      ;; ((type . "emoji")
+      ;;  (attrs (shortName . ":thinking:")
+      ;;         (id . "1f914") (text . "🤔")))
       ("emoji" (make-adf-emoji :text .attrs.text))
-      ("bulletList" (make-adf-emoji :content (jirassic--parse-content .content)))
+      ;; ((type . "bulletList")
+      ;;  (content
+      ;;   . [((type . "listItem")
+      ;;       (content . [((type . "paragraph")
+      ;;                    (content . [((type . "text") (text . "First line"))]))]))
+      ;;      ((type . "listItem")
+      ;;       (content . [((type . "paragraph")
+      ;;                    (content . [((type . "text")(text . "Second line"))]))]))]))
+      ("bulletList" (make-adf-bullet-list :content (jirassic--parse-content .content)))
       ("orderedList" (make-adf-ordered-list :content (jirassic--parse-content .content)))
       ("listItem" (make-adf-list-item :content (jirassic--parse-content .content)))
+      ("paragraph" (jirassic--parse-paragraph node))
+      ("blockquote" (jirassic--parse-blockquote node))
       (_ (warn "Unsupported ADF node type %s" .type)))))
 
 (defun jirassic--parse-content (content)
@@ -82,6 +95,33 @@ See the definition of `adf-code-block' for the constraints of
     (make-adf-code-block
      :content (jirassic--parse-content .content)
      :language .attrs.language)))
+
+(defun jirassic--parse-paragraph (paragraph)
+  "Create an `adf-paragraph' object from a PARAGRAPH ADF node."
+  ;; Example ADF alist:
+  ;; ((type . "paragraph")
+  ;;  (content . [((type . "text")
+  ;;               (text . "Hello world"))]))
+  (declare (pure t) (side-effect-free t))
+  (let-alist paragraph
+    (make-adf-paragraph :content (jirassic--parse-content .content))))
+
+(defun jirassic--parse-blockquote (blockquote)
+  "Create an `adf-blockquote' object from a BLOCKQUOTE ADF node."
+  ;; Example ADF alist:
+  ;; ((type . "blockquote")
+  ;;  (content
+  ;;   . [((type . "paragraph")
+  ;;       (content
+  ;;        . [((type . "text")
+  ;;            (text . "This is a"))]))
+  ;;      ((type . "paragraph")
+  ;;       (content
+  ;;        . [((type . "text")
+  ;;            (text . "multiline quote"))]))]))
+  (declare (pure t) (side-effect-free t))
+  (let-alist blockquote
+    (make-adf-blockquote :content (jirassic--parse-content .content))))
 
 (provide 'jirassic-adf-parser)
 ;;; jirassic-adf-parser.el ends here
