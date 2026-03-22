@@ -83,5 +83,59 @@
     (should (cl-typep emoji 'adf-emoji))
     (should (string= (adf-emoji-text emoji) "🤔"))))
 
+(ert-deftest jirassic-parser-test-parse-paragraph ()
+  (let ((paragraph (jirassic--parse-paragraph
+                    '((type . "paragraph")
+                      (content
+                       . [((type . "text")
+                           (text . "Hello world"))])))))
+    (should (cl-typep paragraph 'adf-paragraph))
+    (should (cl-typep (car (adf-paragraph-content paragraph)) 'adf-text))
+    (should (string= (adf-text-text (car (adf-paragraph-content paragraph)))
+                     "Hello world"))))
+
+(ert-deftest jirassic-parser-test-parse-code-block ()
+  ;; With language
+  (let ((code-block (jirassic--parse-code-block
+                     '((type . "codeBlock")
+                       (attrs (language . "python"))
+                       (content
+                        . [((type . "text")
+                            (text . "class Foo:\n    x: int = 5\n\nf = Foo()"))])))))
+    (should (cl-typep code-block 'adf-code-block))
+    (should (string= (adf-code-block-language code-block) "python"))
+    (should (string= (adf-text-text (car (adf-code-block-content code-block)))
+                     "class Foo:\n    x: int = 5\n\nf = Foo()")))
+
+  ;; Without language
+  (let ((code-block (jirassic--parse-code-block
+                     '((type . "codeBlock")
+                       (content
+                        . [((type . "text")
+                            (text . "hello"))])))))
+    (should (eq (adf-code-block-language code-block) nil))))
+
+(ert-deftest jirassic-parser-test-parse-blockquote ()
+  (let* ((blockquote (jirassic--parse-blockquote
+                      '((type . "blockquote")
+                        (content
+                         . [((type . "paragraph")
+                             (content
+                              . [((type . "text")
+                                  (text . "This is a"))]))
+                            ((type . "paragraph")
+                             (content
+                              . [((type . "text")
+                                  (text . "multiline quote"))]))]))))
+         (content (adf-blockquote-content blockquote)))
+    (should (cl-typep blockquote 'adf-blockquote))
+    (should (= (length content) 2))
+    (should (cl-typep (nth 0 content) 'adf-paragraph))
+    (should (cl-typep (nth 1 content) 'adf-paragraph))
+    (should (string= (adf-text-text (car (adf-paragraph-content (nth 0 content))))
+                     "This is a"))
+    (should (string= (adf-text-text (car (adf-paragraph-content (nth 1 content))))
+                     "multiline quote"))))
+
 (provide 'jirassic-adf-parser-test)
 ;;; jirassic-adf-parser-test.el ends here
