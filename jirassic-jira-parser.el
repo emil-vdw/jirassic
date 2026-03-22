@@ -15,6 +15,7 @@
   (declare (pure t) (side-effect-free t))
   (let-alist node
     (pcase .type
+      ("doc" (jirassic--parse-doc node))
       ("heading" (jirassic--parse-heading node))
       ("text" (jirassic--parse-text node))
       ("codeBlock" (jirassic--parse-code-block node))
@@ -31,14 +32,29 @@
       ;;      ((type . "listItem")
       ;;       (content . [((type . "paragraph")
       ;;                    (content . [((type . "text")(text . "Second line"))]))]))]))
-      ("bulletList" (make-adf-bullet-list :content (jirassic--parse-content .content)))
-      ("orderedList" (make-adf-ordered-list :content (jirassic--parse-content .content)))
-      ("listItem" (make-adf-list-item :content (jirassic--parse-content .content)))
+      ("bulletList" (make-adf-bullet-list :content (jirassic--parse-content-list .content)))
+      ("orderedList" (make-adf-ordered-list :content (jirassic--parse-content-list .content)))
+      ("listItem" (make-adf-list-item :content (jirassic--parse-content-list .content)))
       ("paragraph" (jirassic--parse-paragraph node))
       ("blockquote" (jirassic--parse-blockquote node))
-      (_ (warn "Unsupported ADF node type %s" .type)))))
+      (_ (warn "Unsupported ADF node type %s" .type)
+         ;; Return `nil' so this node can be filtered out.
+         nil))))
 
-(defun jirassic--parse-content (content)
+(defun jirassic--parse-issue (issue)
+  "Parse a Jira ISSUE object."
+  (let-alist issue
+   (make-jira-issue
+    :id .id :key .key
+    :description (jirassic-parse-adf-node .fields.description)
+    :summary .fields.summary)))
+
+(defun jirassic--parse-doc (doc)
+  "Parse an ADF DOC node."
+  (declare (pure t) (side-effect-free t))
+  (make-adf-doc :content (jirassic--parse-content-list (alist-get 'content doc))))
+
+(defun jirassic--parse-content-list (content)
   "Parse all ADF nodes in CONTENT to a list of Jira objects."
   (declare (pure t) (side-effect-free t))
   (seq-remove
@@ -57,7 +73,7 @@
   ;;       (text . "Areas to investigate"))]))
   (declare (pure t) (side-effect-free t))
   (let-alist heading
-    (make-adf-heading :content (jirassic--parse-content .content)
+    (make-adf-heading :content (jirassic--parse-content-list .content)
                       :level .attrs.level)))
 
 (defun jirassic--parse-text (text)
@@ -93,7 +109,7 @@ See the definition of `adf-code-block' for the constraints of
   (declare (pure t) (side-effect-free t))
   (let-alist code-block
     (make-adf-code-block
-     :content (jirassic--parse-content .content)
+     :content (jirassic--parse-content-list .content)
      :language .attrs.language)))
 
 (defun jirassic--parse-paragraph (paragraph)
@@ -104,7 +120,7 @@ See the definition of `adf-code-block' for the constraints of
   ;;               (text . "Hello world"))]))
   (declare (pure t) (side-effect-free t))
   (let-alist paragraph
-    (make-adf-paragraph :content (jirassic--parse-content .content))))
+    (make-adf-paragraph :content (jirassic--parse-content-list .content))))
 
 (defun jirassic--parse-blockquote (blockquote)
   "Create an `adf-blockquote' object from a BLOCKQUOTE ADF node."
@@ -121,7 +137,7 @@ See the definition of `adf-code-block' for the constraints of
   ;;            (text . "multiline quote"))]))]))
   (declare (pure t) (side-effect-free t))
   (let-alist blockquote
-    (make-adf-blockquote :content (jirassic--parse-content .content))))
+    (make-adf-blockquote :content (jirassic--parse-content-list .content))))
 
 (provide 'jirassic-jira-parser)
 ;;; jirassic-jira-parser.el ends here

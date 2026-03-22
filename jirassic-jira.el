@@ -23,7 +23,11 @@
 ;;; Code:
 (require 'cl-lib)
 
-(cl-defstruct jira-issue id key description)
+(cl-defstruct jira-issue
+  "Container for a Jira issue.
+
+DESCRIPTION is an `adf-doc' node."
+  id key summary description)
 
 (cl-defstruct adf-doc content)
 
@@ -164,7 +168,16 @@ CONTENT must contain one or more media nodes."
 ;;; Lists
 (cl-defstruct adf-bullet-list content)
 (cl-defstruct adf-ordered-list content)
-(cl-defstruct adf-list-item content)
+(cl-defstruct adf-list-item
+  "An item in a list.
+
+content must contain at least one of the following nodes:
+- `adf-bullet-list'
+- `adf-code-block'
+- `adf-media-single'
+- `adf-ordered-list'
+- `adf-paragraph' with no `adf-mark'"
+  content)
 
 
 (provide 'jirassic-jira)

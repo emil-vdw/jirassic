@@ -10,8 +10,19 @@
 
 (require 'jirassic-jira)
 
-(defvar level-indent 2
+(defvar jirassic-level-indent 2
   "Number of whitespace characters of indentation per level.")
+
+(defcustom jirassic-org-bullet-char "-"
+  "Character used by default for org bullet lists.
+
+Value may be one of the supported org bullet characters or a function
+that takes the indentation level as an argument and returns one of those characters."
+  :type '(choice (const :tag "-" "-")
+                 (const :tag "+" "+")
+                 (const :tag "*" "*")
+                 (function :tag "Function (level -> char)"))
+  :group 'jirassic)
 
 (defvar jirassic-serializer--supported-marks
   '(code em link strike strong subsup underline)
@@ -39,16 +50,36 @@
     (warn "Jirassic serializer doesn't support serializing %s" node-type)
     (format "###unsupported ADF node: %s###" node-type)))
 
+;;; `jira-issue'
+(cl-defmethod jirassic--serialize-to-org ((obj jira-issue) &optional _level)
+  "Serialise Jira issue OBJ to an org mode task."
+  (declare (pure t) (side-effect-free t))
+  (format "* %s\n%s"
+          (jira-issue-summary obj)
+          (jirassic--serialize-to-org (jira-issue-description obj))))
+
+;;; `adf-doc'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-doc) &optional _level)
+  "Serialize an `adf-doc' OBJ."
+  (declare (pure t) (side-effect-free t))
+  (mapconcat #'jirassic--serialize-to-org (adf-doc-content obj)))
+
 ;;; `adf-heading'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-heading) &optional level)
   "Convert an ADF heading OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   (let ((stars (adf-heading-level obj)))
-    (format "%s %s"
+    (format "\n%s %s"
             (jirassic--string-repeat stars "*")
             (mapconcat (lambda (heading-part)
                          (jirassic--serialize-to-org heading-part level))
                        (adf-heading-content obj)))))
+
+;;; `adf-paragraph'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-paragraph) &optional _level)
+  "Serialize an `adf-paragraph' OBJ."
+  (declare (pure t) (side-effect-free t))
+  (jirassic-serializer--serialize-content-list (adf-paragraph-content obj)))
 
 ;;; `adf-text'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-text) &optional _level)
@@ -97,7 +128,7 @@ Only applies the first supported mark because of org syntax limitations."
 (cl-defmethod jirassic--serialize-to-org ((obj adf-rule) &optional _level)
   "Convert an ADF rule OBJ to an org mode string, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
-  "-----")
+  "\n-----\n")
 
 ;;; `adf-emoji'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-emoji) &optional _level)
@@ -111,14 +142,33 @@ parent container will consider indentation."
 ;;; `adf-bullet-list'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-bullet-list) &optional level)
   "Convert an ADF bullet list OBJ to an org mode string at LEVEL."
-  ;; TODO: indentation
   (declare (pure t) (side-effect-free t))
-  (mapconcat (lambda (list-item-text) (format "- %s" list-item-text))
-             ;; Serialize the content of each `adf-list-item' into an org string
-             (mapcar (lambda (list-item)
-                       (jirassic--serialize-to-org (adf-list-item-content list-item)))
-                     (adf-bullet-list-content obj))
-             "\n"))
+  (let ((bullet-char (if (functionp jirassic-org-bullet-char)
+                         (funcall jirassic-org-bullet-char level)
+                       jirassic-org-bullet-char)))
+    (format
+     ;; Put a leading and trailing newline before each list and pad with
+     ;; LEVEL whitespaces.
+     "\n%s\n"
+     (mapconcat (lambda (list-item-text)
+                  (format "%s%s %s"
+                          ;; Pad with whitespace for the indentation level
+                          (jirassic--string-repeat (jirassic-serializer--level-spaces level)
+                                                   " ")
+                          ;; insert the bullet character
+                          bullet-char
+                          ;; And the content of the bullet
+                          list-item-text))
+                ;; Serialize the content of each `adf-list-item' into an org string
+                (mapcar (lambda (list-item)
+                          (jirassic-serializer--serialize-content-list
+                           (adf-list-item-content list-item)
+                           ;; Since this is inside a list item, we
+                           ;; need to increment the indentation level.
+                           (1+ level)))
+                        (adf-bullet-list-content obj))
+                ;; Join all serialized bullets with newline characters.
+                "\n"))))
 
 ;;; `adf-date'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-date) &optional _level)
@@ -145,14 +195,14 @@ Formats to a date without time components."
   (let ((language (adf-code-block-language obj))
         (content (adf-code-block-content obj)))
     (concat
-     "#+BEGIN_SRC"
+     "\n#+BEGIN_SRC"
      (when (and language
                 (not (string-empty-p language))
                 ;; "none" is also an option in Jira and we want to ignore it.
                 (not (string= language "none")))
        (format " %s" language))
      "\n"
-     (mapconcat #'jirassic--serialize-to-org content)
+     (jirassic-serializer--serialize-content-list content)
      "\n#+END_SRC\n")))
 
 (defun jirassic-serializer--split-whitespace (string)
@@ -169,6 +219,16 @@ Example:
   (list (match-string 1 string)
         (match-string 2 string)
         (match-string 3 string)))
+
+(defun jirassic-serializer--serialize-content-list (content &optional level)
+  "Serialize a list of ADF node CONTENT at LEVEL."
+  (mapconcat (lambda (item)
+               (jirassic--serialize-to-org item (or level 0)))
+             content))
+
+(defun jirassic-serializer--level-spaces (level)
+  "Return the number of whitespaces of indentation for LEVEL."
+  (* jirassic-level-indent level))
 
 (provide 'jirassic-org-serializer)
 ;;; jirassic-org-serializer.el ends here
