@@ -69,6 +69,19 @@
     (should (string= (jirassic--serialize-to-org bullet-list)
                      "- first bullet\n- second bullet\n- third bullet"))))
 
+(ert-deftest jirassic-serializer-test-date ()
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-date :timestamp "1582152559"))
+                   "<2020-02-19 Wed>"))
+
+  ;; Test the empty string case since the API doesn't gaurentee a non-empty string.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-date :timestamp ""))
+                   "<1970-01-01 Thu>")))
+
+(ert-deftest jirassic-serializer-test-hard-break ()
+  (should (string= (jirassic--serialize-to-org (make-adf-hard-break))
+                   "\n")))
 
 
 (provide 'jirassic-org-serializer-test)

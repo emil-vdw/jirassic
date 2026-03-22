@@ -42,7 +42,10 @@
 
 ;;; `adf-text'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-text) &optional level)
-  "Return the text of an ADF text OBJ at LEVEL.
+  "Return the text of an ADF text OBJ, LEVEL is ignored.
+
+LEVEL is ignored because `adf-text' is an inline node, so only its
+parent container will consider indentation.
 
 Only applies the first supported mark because of org syntax limitations."
   (declare (pure t) (side-effect-free t))
@@ -82,19 +85,23 @@ Only applies the first supported mark because of org syntax limitations."
 
 ;;; `adf-rule'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-rule) &optional level)
-  "Convert an ADF rule OBJ to an org mode string at LEVEL."
+  "Convert an ADF rule OBJ to an org mode string, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
   "-----")
 
 ;;; `adf-emoji'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-emoji) &optional level)
-  "Convert an ADF emoji OBJ to an org mode string at LEVEL."
+  "Convert an `adf-emoji' OBJ to an org mode string, LEVEL is ignored.
+
+LEVEL is ignored because `adf-emoji' is an inline node, so only its
+parent container will consider indentation."
   (declare (pure t) (side-effect-free t))
   (adf-emoji-text obj))
 
 ;;; `adf-bullet-list'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-bullet-list) &optional level)
   "Convert an ADF bullet list OBJ to an org mode string at LEVEL."
+  ;; TODO: indentation
   (declare (pure t) (side-effect-free t))
   (mapconcat (lambda (list-item-text) (format "- %s" list-item-text))
              ;; Serialize the content of each `adf-list-item' into an org string
@@ -102,6 +109,24 @@ Only applies the first supported mark because of org syntax limitations."
                        (jirassic--serialize-to-org (adf-list-item-content list-item)))
                      (adf-bullet-list-content obj))
              "\n"))
+
+;;; `adf-date'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-date) &optional level)
+  "Serialize the `adf-date-timestamp' of OBJ to an org timestamp, LEVEL is ignored.
+
+LEVEL is ignored because `adf-date' is an inline node, so only its
+parent container will consider indentation.
+
+Formats to a date without time components."
+  (declare (pure t) (side-effect-free t))
+  (format-time-string "<%Y-%m-%d %a>"
+                      (seconds-to-time (string-to-number (adf-date-timestamp obj)))))
+
+;;; `adf-hard-break'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-hard-break) &optional level)
+  "Serialize an `adf-hard-break' OBJ as a newline character, LEVEL is ignored."
+  (declare (pure t) (side-effect-free t))
+  "\n")
 
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.
