@@ -19,6 +19,7 @@
 
 ;;; Commentary:
 
+;;; Structs for Jira objects and ADF nodes.
 
 ;;; Code:
 (require 'cl-lib)
