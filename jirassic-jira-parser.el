@@ -12,6 +12,9 @@
 
 (defun jirassic-parse-adf-node (node)
   "Convert an alist of data for a Jira ADF NODE into its corresponding object."
+  ;; Some examples are of the data for the relevant node are given
+  ;; here inline, node types that are created in their own function,
+  ;; you can find the example there.
   (declare (pure t) (side-effect-free t))
   (let-alist node
     (pcase .type
@@ -38,7 +41,7 @@
       ("paragraph" (jirassic--parse-paragraph node))
       ("blockquote" (jirassic--parse-blockquote node))
       (_ (warn "Unsupported ADF node type %s" .type)
-         ;; Return `nil' so this node can be filtered out.
+         ;; Return `nil' so this unsupported node can be filtered out.
          nil))))
 
 (defun jirassic--parse-issue (issue)
