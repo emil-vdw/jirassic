@@ -58,7 +58,7 @@
       ;; link
       (should (jirassic-test--marks-equal
                (nth 3 marks) (make-adf-mark  :type 'link
-                                              :attrs '((href . "https://acme.com")))))
+                                             :attrs '((href . "https://acme.com")))))
       ;; strike
       (should (jirassic-test--marks-equal
                (nth 4 marks) (make-adf-mark :type 'strike)))
@@ -136,6 +136,109 @@
                      "This is a"))
     (should (string= (adf-text-text (car (adf-paragraph-content (nth 1 content))))
                      "multiline quote"))))
+
+(ert-deftest jirassic-parser-test-parse-doc ()
+  (let* ((doc (jirassic--parse-doc
+               '((type . "doc")
+                 (content
+                  . [((type . "paragraph")
+                      (content
+                       . [((type . "text")
+                           (text . "Hello world"))]))]))))
+         (content (adf-doc-content doc)))
+    (should (cl-typep doc 'adf-doc))
+    (should (= (length content) 1))
+    (should (cl-typep (car content) 'adf-paragraph))))
+
+(ert-deftest jirassic-parser-test-parse-heading ()
+  (let* ((heading (jirassic--parse-heading
+                   '((type . "heading")
+                     (attrs (level . 2))
+                     (content
+                      . [((type . "text")
+                          (text . "Areas to investigate"))]))))
+         (content (adf-heading-content heading)))
+    (should (cl-typep heading 'adf-heading))
+    (should (= (adf-heading-level heading) 2))
+    (should (= (length content) 1))
+    (should (cl-typep (car content) 'adf-text))
+    (should (string= (adf-text-text (car content)) "Areas to investigate"))))
+
+(ert-deftest jirassic-parser-test-parse-rule ()
+  (let ((rule (jirassic-parse-adf-node '((type . "rule")))))
+    (should (cl-typep rule 'adf-rule))))
+
+(ert-deftest jirassic-parser-test-parse-bullet-list ()
+  (let* ((bullet-list
+          (jirassic-parse-adf-node
+           '((type . "bulletList")
+             (content
+              . [((type . "listItem")
+                  (content
+                   . [((type . "paragraph")
+                       (content . [((type . "text") (text . "First item"))]))]))
+                 ((type . "listItem")
+                  (content
+                   . [((type . "paragraph")
+                       (content . [((type . "text") (text . "Second item"))]))]))
+                 ]))))
+         (content (adf-bullet-list-content bullet-list)))
+    (should (cl-typep bullet-list 'adf-bullet-list))
+    (should (= (length content) 2))
+    (should (cl-typep (nth 0 content) 'adf-list-item))
+    (should (cl-typep (nth 1 content) 'adf-list-item))))
+
+(ert-deftest jirassic-parser-test-parse-ordered-list ()
+  (let* ((ordered-list
+          (jirassic-parse-adf-node
+           '((type . "orderedList")
+             (content
+              . [((type . "listItem")
+                  (content
+                   . [((type . "paragraph")
+                       (content . [((type . "text") (text . "First item"))]))]))
+                 ((type . "listItem")
+                  (content
+                   . [((type . "paragraph")
+                       (content . [((type . "text") (text . "Second item"))]))]))
+                 ]))))
+         (content (adf-ordered-list-content ordered-list)))
+    (should (cl-typep ordered-list 'adf-ordered-list))
+    (should (= (length content) 2))
+    (should (cl-typep (nth 0 content) 'adf-list-item))
+    (should (cl-typep (nth 1 content) 'adf-list-item))))
+
+(ert-deftest jirassic-parser-test-parse-list-item ()
+  (let* ((list-item
+          (jirassic-parse-adf-node
+           '((type . "listItem")
+             (content
+              . [((type . "paragraph")
+                  (content . [((type . "text") (text . "List item text"))]))]))))
+         (content (adf-list-item-content list-item)))
+    (should (cl-typep list-item 'adf-list-item))
+    (should (= (length content) 1))
+    (should (cl-typep (car content) 'adf-paragraph))
+    (should (string= (adf-text-text (car (adf-paragraph-content (car content))))
+                     "List item text"))))
+
+(ert-deftest jirassic-parser-test-parse-issue ()
+  (let ((issue (jirassic--parse-issue
+                '((id . "10001")
+                  (key . "PROJ-1")
+                  (fields
+                   (summary . "Fix the bug")
+                   (description
+                    (type . "doc")
+                    (content
+                     . [((type . "paragraph")
+                         (content . [((type . "text")
+                                      (text . "Bug description"))]))])))))))
+    (should (cl-typep issue 'jira-issue))
+    (should (string= (jira-issue-id issue) "10001"))
+    (should (string= (jira-issue-key issue) "PROJ-1"))
+    (should (string= (jira-issue-summary issue) "Fix the bug"))
+    (should (cl-typep (jira-issue-description issue) 'adf-doc))))
 
 (provide 'jirassic-jira-parser-test)
 ;;; jirassic-jira-parser-test.el ends here
