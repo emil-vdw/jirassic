@@ -210,6 +210,38 @@ content must contain at least one of the following nodes:
                    ;; adf-table-row
                    )))
 
+(cl-defgeneric jirassic-adjust-heading-level (obj amount)
+  "Recursively promote or demote all headings in OBJ by AMOUNT.
+
+AMOUNT may be a positive or negative integer, negative values demote and
+positive values promote headings.")
+
+(cl-defmethod jirassic-adjust-heading-level ((node t) _amount)
+  "NODE should not contain any headings, return as is."
+  node)
+
+(cl-defmethod jirassic-adjust-heading-level ((heading adf-heading) amount)
+  "Adjust HEADING by adding AMOUNT but never less than 1."
+  (let ((new-heading (copy-adf-heading heading)))
+    (setf (adf-heading-level new-heading)
+          (max 1 (+ (adf-heading-level heading) amount)))
+    new-heading))
+
+(cl-defmethod jirassic-adjust-heading-level ((doc adf-doc) amount)
+  "Adjust all heading nodes in DOC by AMOUNT."
+  (let ((new-doc (copy-adf-doc doc)))
+    (setf (adf-doc-content new-doc)
+          (mapcar (lambda (node)
+                    (jirassic-adjust-heading-level node amount))
+                  (adf-doc-content doc)))
+    new-doc))
+
+(cl-defmethod jirassic-adjust-heading-level ((issue jira-issue) amount)
+  "Return a copy of ISSUE with all heading adjusted by AMOUNT."
+  (let ((new-issue (copy-jira-issue issue)))
+    (setf (jira-issue-description new-issue)
+          (jirassic-adjust-heading-level (jira-issue-description issue) amount))
+    new-issue))
 
 (provide 'jirassic-jira)
 ;;; jirassic-jira.el ends here
