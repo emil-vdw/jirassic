@@ -62,14 +62,14 @@ that takes the indentation level as an argument and returns one of those charact
 (cl-defmethod jirassic--serialize-to-org ((obj adf-doc) &optional _level)
   "Serialize an `adf-doc' OBJ."
   (declare (pure t) (side-effect-free t))
-  (mapconcat #'jirassic--serialize-to-org (adf-doc-content obj)))
+  (jirassic-serializer--serialize-content-list (adf-doc-content obj)))
 
 ;;; `adf-heading'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-heading) &optional level)
   "Convert an ADF heading OBJ to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   (let ((stars (adf-heading-level obj)))
-    (format "\n%s %s"
+    (format "%s %s"
             (jirassic--string-repeat stars "*")
             (mapconcat (lambda (heading-part)
                          (jirassic--serialize-to-org heading-part level))
@@ -128,7 +128,7 @@ Only applies the first supported mark because of org syntax limitations."
 (cl-defmethod jirassic--serialize-to-org ((obj adf-rule) &optional _level)
   "Convert an ADF rule OBJ to an org mode string, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
-  "\n-----\n")
+  "-----")
 
 ;;; `adf-emoji'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-emoji) &optional _level)
@@ -149,7 +149,7 @@ parent container will consider indentation."
     (format
      ;; Put a leading and trailing newline before each list and pad with
      ;; LEVEL whitespaces.
-     "\n%s\n"
+     "%s"
      (mapconcat (lambda (list-item-text)
                   (format "%s%s %s"
                           ;; Pad with whitespace for the indentation level
@@ -168,7 +168,8 @@ parent container will consider indentation."
                            (1+ level)))
                         (adf-bullet-list-content obj))
                 ;; Join all serialized bullets with newline characters.
-                "\n"))))
+                ;; "\n"
+                ))))
 
 ;;; `adf-date'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-date) &optional _level)
@@ -195,7 +196,7 @@ Formats to a date without time components."
   (let ((language (adf-code-block-language obj))
         (content (adf-code-block-content obj)))
     (concat
-     "\n#+BEGIN_SRC"
+     "#+BEGIN_SRC"
      (when (and language
                 (not (string-empty-p language))
                 ;; "none" is also an option in Jira and we want to ignore it.
@@ -203,7 +204,14 @@ Formats to a date without time components."
        (format " %s" language))
      "\n"
      (jirassic-serializer--serialize-content-list content)
-     "\n#+END_SRC\n")))
+     "\n#+END_SRC")))
+
+;;; `adf-blockquote'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-blockquote) &optional _level)
+  "Serialise an `adf-blockquote' OBJ to an org mode ."
+  (declare (pure t) (side-effect-free t))
+  (format "\n#+BEGIN_QUOTE\n%s\n#+END_QUOTE\n"
+          (jirassic-serializer--serialize-content-list (adf-blockquote-content obj))))
 
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.
@@ -222,9 +230,34 @@ Example:
 
 (defun jirassic-serializer--serialize-content-list (content &optional level)
   "Serialize a list of ADF node CONTENT at LEVEL."
-  (mapconcat (lambda (item)
-               (jirassic--serialize-to-org item (or level 0)))
-             content))
+  ;; Nodes in CONTENT can be block nodes (like `adf-paragraph' or
+  ;; `adf-code-block'), in which case we have to put two newline
+  ;; characters in between subsequent block nodes.
+  (string-join
+   (seq-mapn
+    (lambda (cur-node next-node)
+      (concat (jirassic--serialize-to-org cur-node (or level 0))
+              (when (and (jirassic-jira-block-node-p cur-node)
+                         (jirassic-jira-block-node-p next-node))
+                (cond
+                 ((and (adf-heading-p cur-node) (adf-heading-p next-node))
+                  (if (eq (adf-heading-level cur-node) (adf-heading-level next-node))
+                      "\n\n"
+                    "\n"))
+                 ((and (adf-heading-p cur-node) (adf-heading-p next-node)) "\n\n")
+                 ((adf-heading-p next-node) "\n\n")
+                 ;; Between a horizontal rule and any other block
+                 ;; node, insert two newlines.
+                 ((or (and (adf-rule-p cur-node) (not (null next-node)))
+                      (and (adf-rule-p next-node) (not (null cur-node))))
+                  "\n\n")
+                 (t "\n")))))
+    ;; Loop over two nodes at a time, the current and next node, so we
+    ;; can spot consecutive block nodes.
+    content
+    ;; Skip the first element and add `nil' so the list is the same
+    ;; size and the last element has next node `nil'.
+    (append (cdr content) '(nil)))))
 
 (defun jirassic-serializer--level-spaces (level)
   "Return the number of whitespaces of indentation for LEVEL."

@@ -181,5 +181,32 @@ content must contain at least one of the following nodes:
   content)
 
 
+(defun jirassic-jira-block-node-p (node)
+  "Return t if NODE is as block node."
+  (cl-typep node '(or
+                   ;; Top level block nodes
+                   adf-blockquote
+                   adf-bullet-list
+                   adf-code-block
+                   ;; adf-expand
+                   adf-heading
+                   adf-media-group
+                   adf-media-single
+                   ;; adf-ordred-list
+                   ;; adf-panel
+                   adf-paragraph
+                   adf-rule
+                   ;; adf-table
+
+                   ;; Child block nodes:
+                   adf-list-item
+                   adf-media
+                   ;; adf-nested-expand
+                   ;; adf-table-cell
+                   ;; adf-table-header
+                   ;; adf-table-row
+                   )))
+
+
 (provide 'jirassic-jira)
 ;;; jirassic-jira.el ends here

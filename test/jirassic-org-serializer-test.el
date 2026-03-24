@@ -128,6 +128,65 @@
                      :language "none"
                      :content (list (make-adf-text :text "hello"))))
                    "#+BEGIN_SRC\nhello\n#+END_SRC\n")))
+;;; `adf-paragraph'
+(ert-deftest jirassic-serializer-test-paragraph ()
+  ;; Plain text content
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-paragraph
+                     :content (list (make-adf-text :text "Hello world"))))
+                   "Hello world"))
+
+  ;; Multiple inline nodes concatenated
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-paragraph
+                     :content (list (make-adf-text :text "Hello ")
+                                    (make-adf-text :text "world"
+                                                   :marks (list (make-adf-mark :type 'strong))))))
+                   "Hello *world*")))
+
+;;; `adf-heading'
+(ert-deftest jirassic-serializer-test-heading ()
+  ;; Level 1
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-heading
+                     :level 1
+                     :content (list (make-adf-text :text "Top level"))))
+                   "\n* Top level"))
+
+  ;; Level 2
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-heading
+                     :level 2
+                     :content (list (make-adf-text :text "Subsection"))))
+                   "\n** Subsection"))
+
+  ;; Content with a mark
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-heading
+                     :level 3
+                     :content (list (make-adf-text :text "Emphasized"
+                                                   :marks (list (make-adf-mark :type 'em))))))
+                   "\n*** /Emphasized/")))
+
+;;; `adf-doc'
+(ert-deftest jirassic-serializer-test-doc ()
+  ;; Single paragraph
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-doc
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "Hello world"))))))
+                   "Hello world"))
+
+  ;; Multiple nodes joined without separator
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-doc
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "Intro")))
+                                    (make-adf-heading
+                                     :level 1
+                                     :content (list (make-adf-text :text "Section"))))))
+                   "Intro\n* Section")))
+
 ;;; fallback serializer
 (cl-defstruct jirassic-test--unsupported-node)
 
