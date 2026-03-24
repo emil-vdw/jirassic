@@ -40,6 +40,9 @@
       ("listItem" (make-adf-list-item :content (jirassic--parse-content-list .content)))
       ("paragraph" (jirassic--parse-paragraph node))
       ("blockquote" (jirassic--parse-blockquote node))
+      ;; ((type . "inlineCard") (attrs (url . "https://acme.com")))
+      ;; ((type . "inlineCard") (attrs (data (@context . "https://schema.org") ...)))
+      ("inlineCard" (make-adf-inline-card :url .attrs.url :data .attrs.data))
       (_ (warn "Unsupported ADF node type %s" .type)
          ;; Return `nil' so this unsupported node can be filtered out.
          nil))))

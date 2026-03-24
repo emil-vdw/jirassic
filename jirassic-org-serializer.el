@@ -139,6 +139,25 @@ parent container will consider indentation."
   (declare (pure t) (side-effect-free t))
   (adf-emoji-text obj))
 
+;;; `adf-inline-card'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-inline-card) &optional _level)
+  "Serialize an `adf-inline-card' OBJ to an org link, LEVEL is ignored.
+
+LEVEL is ignored because `adf-inline-card' is an inline node, so only
+its parent container will consider indentation."
+  ;; The object will only ever contain a URL or DATA but never both.
+  (declare (pure t) (side-effect-free t))
+  (if-let ((url (adf-inline-card-url obj)))
+      ;; Simple link if we only have the URL
+      (format "[[%s]]" url)
+    ;; Otherwise, format to a named link using the JSONLD data.
+    (let* ((data (adf-inline-card-data obj))
+           (link (or (alist-get 'url data) (alist-get '@id data)))
+           (name (alist-get 'name data)))
+      (if name
+          (format "[[%s][%s]]" link name)
+        (format "[[%s]]" link)))))
+
 ;;; `adf-bullet-list'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-bullet-list) &optional level)
   "Convert an ADF bullet list OBJ to an org mode string at LEVEL."

@@ -98,6 +98,26 @@
   (should (string= (jirassic--serialize-to-org (make-adf-emoji :text ":smile:"))
                    ":smile:")))
 
+;;; `adf-inline-card'
+(ert-deftest jirassic-serializer-test-inline-card ()
+  ;; URL variant — no display text
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-inline-card :url "https://acme.com"))
+                   "[[https://acme.com]]"))
+
+  ;; Data variant with name — becomes a described link
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-inline-card
+                     :data '((url . "https://acme.com/page")
+                             (name . "My Page"))))
+                   "[[https://acme.com/page][My Page]]"))
+
+  ;; Data variant without name — falls back to bare link
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-inline-card
+                     :data '((@id . "https://acme.com/page"))))
+                   "[[https://acme.com/page]]")))
+
 ;;; `adf-code-block'
 (ert-deftest jirassic-serializer-test-code-block ()
   ;; With language
@@ -151,14 +171,14 @@
                     (make-adf-heading
                      :level 1
                      :content (list (make-adf-text :text "Top level"))))
-                   "\n* Top level"))
+                   "* Top level"))
 
   ;; Level 2
   (should (string= (jirassic--serialize-to-org
                     (make-adf-heading
                      :level 2
                      :content (list (make-adf-text :text "Subsection"))))
-                   "\n** Subsection"))
+                   "** Subsection"))
 
   ;; Content with a mark
   (should (string= (jirassic--serialize-to-org
@@ -166,7 +186,7 @@
                      :level 3
                      :content (list (make-adf-text :text "Emphasized"
                                                    :marks (list (make-adf-mark :type 'em))))))
-                   "\n*** /Emphasized/")))
+                   "*** /Emphasized/")))
 
 ;;; `adf-doc'
 (ert-deftest jirassic-serializer-test-doc ()
@@ -177,7 +197,7 @@
                                      :content (list (make-adf-text :text "Hello world"))))))
                    "Hello world"))
 
-  ;; Multiple nodes joined without separator
+  ;; Multiple nodes: two newlines are inserted before a heading
   (should (string= (jirassic--serialize-to-org
                     (make-adf-doc
                      :content (list (make-adf-paragraph
@@ -185,7 +205,7 @@
                                     (make-adf-heading
                                      :level 1
                                      :content (list (make-adf-text :text "Section"))))))
-                   "Intro\n* Section")))
+                   "Intro\n\n* Section")))
 
 ;;; fallback serializer
 (cl-defstruct jirassic-test--unsupported-node)

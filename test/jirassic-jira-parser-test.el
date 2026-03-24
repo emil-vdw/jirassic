@@ -222,6 +222,24 @@
     (should (string= (adf-text-text (car (adf-paragraph-content (car content))))
                      "List item text"))))
 
+(ert-deftest jirassic-parser-test-parse-inline-card ()
+  ;; URL variant
+  (let ((card (jirassic-parse-adf-node '((type . "inlineCard")
+                                         (attrs (url . "https://acme.com"))))))
+    (should (cl-typep card 'adf-inline-card))
+    (should (string= (adf-inline-card-url card) "https://acme.com"))
+    (should (eq (adf-inline-card-data card) nil)))
+
+  ;; Data variant
+  (let* ((data '((@context . "https://schema.org")
+                 (@type . "DigitalDocument")
+                 (name . "My Confluence Page")))
+         (card (jirassic-parse-adf-node `((type . "inlineCard")
+                                          (attrs (data . ,data))))))
+    (should (cl-typep card 'adf-inline-card))
+    (should (eq (adf-inline-card-url card) nil))
+    (should (equal (adf-inline-card-data card) data))))
+
 (ert-deftest jirassic-parser-test-parse-issue ()
   (let ((issue (jirassic--parse-issue
                 '((id . "10001")
