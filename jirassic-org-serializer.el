@@ -142,6 +142,11 @@ parent container will consider indentation."
 ;;; `adf-bullet-list'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-bullet-list) &optional level)
   "Convert an ADF bullet list OBJ to an org mode string at LEVEL."
+  ;; We serialize `adf-list-item' children directly in this function
+  ;; instead of creating a dedicated serializer function because then
+  ;; we don't have to worry about how to know what type of list the
+  ;; parent is, which we need to know to determine the type of marker
+  ;; (e.g. "1." vs "-").
   (declare (pure t) (side-effect-free t))
   (let ((bullet-char (if (functionp jirassic-org-bullet-char)
                          (funcall jirassic-org-bullet-char level)
@@ -168,7 +173,7 @@ parent container will consider indentation."
                            (1+ level)))
                         (adf-bullet-list-content obj))
                 ;; Join all serialized bullets with newline characters.
-                ;; "\n"
+                "\n"
                 ))))
 
 ;;; `adf-date'
@@ -241,10 +246,18 @@ Example:
                          (jirassic-jira-block-node-p next-node))
                 (cond
                  ((and (adf-heading-p cur-node) (adf-heading-p next-node))
+                  ;; For subsequent headings, add an extra newline if
+                  ;; they are on the same level (siblings) but only a
+                  ;; single newline between a parent and child
+                  ;; heading.
+                  ;;
+                  ;; TODO: make this customizable via a `defcustom'
+                  ;; (defaults from `org-blank-before-new-entry'?)
                   (if (eq (adf-heading-level cur-node) (adf-heading-level next-node))
                       "\n\n"
                     "\n"))
-                 ((and (adf-heading-p cur-node) (adf-heading-p next-node)) "\n\n")
+                 ;; After any other block node and before a heading,
+                 ;; put two newlines.
                  ((adf-heading-p next-node) "\n\n")
                  ;; Between a horizontal rule and any other block
                  ;; node, insert two newlines.
