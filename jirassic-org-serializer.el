@@ -28,12 +28,12 @@ that takes the indentation level as an argument and returns one of those charact
   '(code em link strike strong subsup underline)
   "The type of text marks supported by `jirassic--serialize-to-org'.")
 
-(cl-defgeneric jirassic--serialize-to-org (obj &optional level)
-  "Serialize OBJ to an `org-mode' string at heading LEVEL.")
+(cl-defgeneric jirassic--serialize-to-org (node &optional level)
+  "Serialize NODE to an `org-mode' string at heading LEVEL.")
 
-(cl-defmethod jirassic--serialize-to-org :around (obj &optional level)
+(cl-defmethod jirassic--serialize-to-org :around (node &optional level)
   "Default level to 0."
-  (cl-call-next-method obj (or level 0)))
+  (cl-call-next-method node (or level 0)))
 
 (defun jirassic--string-repeat (num s)
   "Repeat string S NUM times."
@@ -41,22 +41,22 @@ that takes the indentation level as an argument and returns one of those charact
   (apply #'concat (make-list num s)))
 
 ;;; Default serializer when there isn't one specific to the node type.
-(cl-defmethod jirassic--serialize-to-org ((obj t) &optional _level)
-  "Warn the user and return a placeholder of unsupported node OBJ."
+(cl-defmethod jirassic--serialize-to-org ((node t) &optional _level)
+  "Warn the user and return a placeholder of unsupported NODE."
   ;; This is a fallback serializer that is only meant to be dispatched
   ;; when no specific serializer is defined for the given node type.
   (declare (pure t) (side-effect-free t))
-  (let ((node-type (cl-type-of obj)))
+  (let ((node-type (cl-type-of node)))
     (warn "Jirassic serializer doesn't support serializing %s" node-type)
     (format "###unsupported ADF node: %s###" node-type)))
 
 ;;; `jira-issue'
-(cl-defmethod jirassic--serialize-to-org ((obj jira-issue) &optional _level)
-  "Serialise Jira issue OBJ to an org mode task."
+(cl-defmethod jirassic--serialize-to-org ((issue jira-issue) &optional _level)
+  "Serialise Jira ISSUE to an org mode task."
   (declare (pure t) (side-effect-free t))
   (format "* %s\n%s"
-          (jira-issue-summary obj)
-          (jirassic--serialize-to-org (jira-issue-description obj))))
+          (jira-issue-summary issue)
+          (jirassic--serialize-to-org (jira-issue-description issue))))
 
 ;;; `adf-doc'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-doc) &optional _level)
@@ -170,30 +170,42 @@ its parent container will consider indentation."
   (let ((bullet-char (if (functionp jirassic-org-bullet-char)
                          (funcall jirassic-org-bullet-char level)
                        jirassic-org-bullet-char)))
-    (format
-     ;; Put a leading and trailing newline before each list and pad with
-     ;; LEVEL whitespaces.
-     "%s"
-     (mapconcat (lambda (list-item-text)
-                  (format "%s%s %s"
-                          ;; Pad with whitespace for the indentation level
-                          (jirassic--string-repeat (jirassic-serializer--level-spaces level)
-                                                   " ")
-                          ;; insert the bullet character
-                          bullet-char
-                          ;; And the content of the bullet
-                          list-item-text))
-                ;; Serialize the content of each `adf-list-item' into an org string
-                (mapcar (lambda (list-item)
-                          (jirassic-serializer--serialize-content-list
-                           (adf-list-item-content list-item)
-                           ;; Since this is inside a list item, we
-                           ;; need to increment the indentation level.
-                           (1+ level)))
-                        (adf-bullet-list-content obj))
-                ;; Join all serialized bullets with newline characters.
-                "\n"
-                ))))
+    (mapconcat (lambda (list-item-text)
+                 (format "%s%s %s"
+                         ;; Indent to LEVEL
+                         (jirassic--string-repeat (jirassic-serializer--level-spaces level)
+                                                  " ")
+                         bullet-char
+                         list-item-text))
+               ;; Serialize the content of each `adf-list-item' into an org string
+               (mapcar (lambda (list-item)
+                         (jirassic-serializer--serialize-content-list
+                          (adf-list-item-content list-item)
+                          ;; Since this is inside a list item, we
+                          ;; need to increment the indentation level.
+                          (1+ level)))
+                       (adf-bullet-list-content obj))
+               ;; Join all serialized bullets with newline characters.
+               "\n")))
+
+;;; `adf-ordered-list'
+(cl-defmethod jirassic--serialize-to-org ((obj adf-ordered-list) &optional level)
+  "Convert an ADF ordered list OBJ to an org mode string at LEVEL."
+  (declare (pure t) (side-effect-free t))
+  (mapconcat
+   'identity
+   (seq-map-indexed
+    (lambda (list-item index)
+      (format "%s%d. %s"
+              ;; Indent at LEVEL.
+              (jirassic--string-repeat (jirassic-serializer--level-spaces level) " ")
+              ;; List item number
+              (1+ index)
+              (jirassic-serializer--serialize-content-list
+               (adf-list-item-content list-item) (1+ level))))
+    (adf-ordered-list-content obj))
+   ;; Join all list items with newline characters
+   "\n"))
 
 ;;; `adf-date'
 (cl-defmethod jirassic--serialize-to-org ((obj adf-date) &optional _level)

@@ -32,7 +32,11 @@ DESCRIPTION is an `adf-doc' node."
 
 (cl-defstruct adf-doc content)
 
-(cl-defstruct adf-heading content level)
+(cl-defstruct adf-heading
+  "Represents a heading in the document.
+
+LEVEL is an integer greater or equal to 1."
+  content level)
 
 (cl-defstruct adf-paragraph
   "Container for a block of formatted text delineated by a carriage return.
@@ -192,7 +196,7 @@ content must contain at least one of the following nodes:
                    adf-heading
                    adf-media-group
                    adf-media-single
-                   ;; adf-ordred-list
+                   adf-ordered-list
                    ;; adf-panel
                    adf-paragraph
                    adf-rule
