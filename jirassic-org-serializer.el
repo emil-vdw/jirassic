@@ -56,7 +56,13 @@ that takes the indentation level as an argument and returns one of those charact
   (declare (pure t) (side-effect-free t))
   (format "* %s\n%s"
           (jira-issue-summary issue)
-          (jirassic--serialize-to-org (jira-issue-description issue))))
+          (jirassic--serialize-to-org
+           (jirassic-adjust-heading-level
+            ;; Promote all headings in the description by 1 before
+            ;; serializing because we want to have the issue summary
+            ;; as the level 1 heading and all headings in the
+            ;; description as children.
+            (jira-issue-description issue) 1))))
 
 ;;; `adf-doc'
 (cl-defmethod jirassic--serialize-to-org ((doc adf-doc) &optional _level)
