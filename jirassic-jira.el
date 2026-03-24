@@ -184,7 +184,6 @@ content must contain at least one of the following nodes:
 - `adf-paragraph' with no `adf-mark'"
   content)
 
-
 (defun jirassic-jira-block-node-p (node)
   "Return t if NODE is as block node."
   (cl-typep node '(or

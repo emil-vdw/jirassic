@@ -59,31 +59,31 @@ that takes the indentation level as an argument and returns one of those charact
           (jirassic--serialize-to-org (jira-issue-description issue))))
 
 ;;; `adf-doc'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-doc) &optional _level)
-  "Serialize an `adf-doc' OBJ."
+(cl-defmethod jirassic--serialize-to-org ((doc adf-doc) &optional _level)
+  "Serialize DOC."
   (declare (pure t) (side-effect-free t))
-  (jirassic-serializer--serialize-content-list (adf-doc-content obj)))
+  (jirassic-serializer--serialize-content-list (adf-doc-content doc)))
 
 ;;; `adf-heading'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-heading) &optional level)
-  "Convert an ADF heading OBJ to an org mode string at LEVEL."
+(cl-defmethod jirassic--serialize-to-org ((heading adf-heading) &optional level)
+  "Convert HEADING to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
-  (let ((stars (adf-heading-level obj)))
+  (let ((stars (adf-heading-level heading)))
     (format "%s %s"
             (jirassic--string-repeat stars "*")
             (mapconcat (lambda (heading-part)
                          (jirassic--serialize-to-org heading-part level))
-                       (adf-heading-content obj)))))
+                       (adf-heading-content heading)))))
 
 ;;; `adf-paragraph'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-paragraph) &optional _level)
-  "Serialize an `adf-paragraph' OBJ."
+(cl-defmethod jirassic--serialize-to-org ((paragraph adf-paragraph) &optional _level)
+  "Serialize PARAGRAPH."
   (declare (pure t) (side-effect-free t))
-  (jirassic-serializer--serialize-content-list (adf-paragraph-content obj)))
+  (jirassic-serializer--serialize-content-list (adf-paragraph-content paragraph)))
 
 ;;; `adf-text'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-text) &optional _level)
-  "Return the text of an ADF text OBJ, LEVEL is ignored.
+(cl-defmethod jirassic--serialize-to-org ((text adf-text) &optional _level)
+  "Return TEXT serialized to org, LEVEL is ignored.
 
 LEVEL is ignored because `adf-text' is an inline node, so only its
 parent container will consider indentation.
@@ -94,8 +94,8 @@ Only applies the first supported mark because of org syntax limitations."
         (mark (car (seq-filter
                     (lambda (mark) (member (adf-mark-type mark)
                                            jirassic-serializer--supported-marks))
-                    (adf-text-marks obj))))
-        (full-text (adf-text-text obj)))
+                    (adf-text-marks text))))
+        (full-text (adf-text-text text)))
     (if mark
         ;; The text we need to format w.r.t. the given mark may start or end
         ;; with some whitespace, e.g. " string ". Since org-mode syntax for these
@@ -125,33 +125,33 @@ Only applies the first supported mark because of org syntax limitations."
       full-text)))
 
 ;;; `adf-rule'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-rule) &optional _level)
-  "Convert an ADF rule OBJ to an org mode string, LEVEL is ignored."
+(cl-defmethod jirassic--serialize-to-org ((_rule adf-rule) &optional _level)
+  "Serialize a rule to an org horizontal rule string, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
   "-----")
 
 ;;; `adf-emoji'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-emoji) &optional _level)
-  "Convert an `adf-emoji' OBJ to an org mode string, LEVEL is ignored.
+(cl-defmethod jirassic--serialize-to-org ((emoji adf-emoji) &optional _level)
+  "Serialize EMOJI to an org mode string, LEVEL is ignored.
 
 LEVEL is ignored because `adf-emoji' is an inline node, so only its
 parent container will consider indentation."
   (declare (pure t) (side-effect-free t))
-  (adf-emoji-text obj))
+  (adf-emoji-text emoji))
 
 ;;; `adf-inline-card'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-inline-card) &optional _level)
-  "Serialize an `adf-inline-card' OBJ to an org link, LEVEL is ignored.
+(cl-defmethod jirassic--serialize-to-org ((card adf-inline-card) &optional _level)
+  "Serialize CARD to an org link, LEVEL is ignored.
 
 LEVEL is ignored because `adf-inline-card' is an inline node, so only
 its parent container will consider indentation."
-  ;; The object will only ever contain a URL or DATA but never both.
+  ;; The card will only ever contain a URL or DATA but never both.
   (declare (pure t) (side-effect-free t))
-  (if-let ((url (adf-inline-card-url obj)))
+  (if-let ((url (adf-inline-card-url card)))
       ;; Simple link if we only have the URL
       (format "[[%s]]" url)
     ;; Otherwise, format to a named link using the JSONLD data.
-    (let* ((data (adf-inline-card-data obj))
+    (let* ((data (adf-inline-card-data card))
            (link (or (alist-get 'url data) (alist-get '@id data)))
            (name (alist-get 'name data)))
       (if name
@@ -159,8 +159,8 @@ its parent container will consider indentation."
         (format "[[%s]]" link)))))
 
 ;;; `adf-bullet-list'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-bullet-list) &optional level)
-  "Convert an ADF bullet list OBJ to an org mode string at LEVEL."
+(cl-defmethod jirassic--serialize-to-org ((bullet-list adf-bullet-list) &optional level)
+  "Convert BULLET-LIST to an org mode string at LEVEL."
   ;; We serialize `adf-list-item' children directly in this function
   ;; instead of creating a dedicated serializer function because then
   ;; we don't have to worry about how to know what type of list the
@@ -184,13 +184,13 @@ its parent container will consider indentation."
                           ;; Since this is inside a list item, we
                           ;; need to increment the indentation level.
                           (1+ level)))
-                       (adf-bullet-list-content obj))
+                       (adf-bullet-list-content bullet-list))
                ;; Join all serialized bullets with newline characters.
                "\n")))
 
 ;;; `adf-ordered-list'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-ordered-list) &optional level)
-  "Convert an ADF ordered list OBJ to an org mode string at LEVEL."
+(cl-defmethod jirassic--serialize-to-org ((ordered-list adf-ordered-list) &optional level)
+  "Convert ORDERED-LIST to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
   (mapconcat
    'identity
@@ -203,13 +203,13 @@ its parent container will consider indentation."
               (1+ index)
               (jirassic-serializer--serialize-content-list
                (adf-list-item-content list-item) (1+ level))))
-    (adf-ordered-list-content obj))
+    (adf-ordered-list-content ordered-list))
    ;; Join all list items with newline characters
    "\n"))
 
 ;;; `adf-date'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-date) &optional _level)
-  "Serialize the `adf-date-timestamp' of OBJ to an org timestamp, LEVEL is ignored.
+(cl-defmethod jirassic--serialize-to-org ((date adf-date) &optional _level)
+  "Serialize DATE to an org timestamp, LEVEL is ignored.
 
 LEVEL is ignored because `adf-date' is an inline node, so only its
 parent container will consider indentation.
@@ -217,20 +217,20 @@ parent container will consider indentation.
 Formats to a date without time components."
   (declare (pure t) (side-effect-free t))
   (format-time-string "<%Y-%m-%d %a>"
-                      (seconds-to-time (string-to-number (adf-date-timestamp obj)))))
+                      (seconds-to-time (string-to-number (adf-date-timestamp date)))))
 
 ;;; `adf-hard-break'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-hard-break) &optional _level)
-  "Serialize an `adf-hard-break' OBJ as a newline character, LEVEL is ignored."
+(cl-defmethod jirassic--serialize-to-org ((_hard-break adf-hard-break) &optional _level)
+  "Serialize a hard-break as a newline character, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
   "\n")
 
 ;;; `adf-code-block'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-code-block) &optional _level)
-  "Serialize an `adf-code-block' OBJ as an org source block, LEVEL is ignored."
+(cl-defmethod jirassic--serialize-to-org ((code-block adf-code-block) &optional _level)
+  "Serialize CODE-BLOCK as an org source block, LEVEL is ignored."
   (declare (pure t) (side-effect-free t))
-  (let ((language (adf-code-block-language obj))
-        (content (adf-code-block-content obj)))
+  (let ((language (adf-code-block-language code-block))
+        (content (adf-code-block-content code-block)))
     (concat
      "#+BEGIN_SRC"
      (when (and language
@@ -243,11 +243,11 @@ Formats to a date without time components."
      "\n#+END_SRC")))
 
 ;;; `adf-blockquote'
-(cl-defmethod jirassic--serialize-to-org ((obj adf-blockquote) &optional _level)
-  "Serialise an `adf-blockquote' OBJ to an org mode ."
+(cl-defmethod jirassic--serialize-to-org ((blockquote adf-blockquote) &optional _level)
+  "Serialise BLOCKQUOTE to an org mode quote block."
   (declare (pure t) (side-effect-free t))
   (format "\n#+BEGIN_QUOTE\n%s\n#+END_QUOTE\n"
-          (jirassic-serializer--serialize-content-list (adf-blockquote-content obj))))
+          (jirassic-serializer--serialize-content-list (adf-blockquote-content blockquote))))
 
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.
