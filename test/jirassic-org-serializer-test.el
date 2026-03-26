@@ -71,6 +71,32 @@
     (should (string= (jirassic--serialize-to-org bullet-list)
                      "- first bullet\n- second bullet\n- third bullet"))))
 
+;;; `adf-ordered-list'
+(ert-deftest jirassic-serializer-test-ordered-list ()
+  ;; Basic numbered list
+  (let ((ordered-list
+         (make-adf-ordered-list
+          :content (list (make-adf-list-item
+                          :content (list (make-adf-paragraph
+                                          :content (list (make-adf-text :text "first item")))))
+                         (make-adf-list-item
+                          :content (list (make-adf-paragraph
+                                          :content (list (make-adf-text :text "second item")))))
+                         (make-adf-list-item
+                          :content (list (make-adf-paragraph
+                                          :content (list (make-adf-text :text "third item")))))))))
+    (should (string= (jirassic--serialize-to-org ordered-list)
+                     "1. first item\n2. second item\n3. third item")))
+
+  ;; Indented (level 1)
+  (let ((ordered-list
+         (make-adf-ordered-list
+          :content (list (make-adf-list-item
+                          :content (list (make-adf-paragraph
+                                          :content (list (make-adf-text :text "item")))))))))
+    (should (string= (jirassic--serialize-to-org ordered-list 1)
+                     "  1. item"))))
+
 ;;; `adf-date'
 (ert-deftest jirassic-serializer-test-date ()
   (let ((system-time-locale "en_GB.UTF-8"))
@@ -127,7 +153,7 @@
                      :content (list
                                (make-adf-text :text
                                               "class Foo:\n    x: int = 5\n\nf = Foo()"))))
-                   "#+BEGIN_SRC python\nclass Foo:\n    x: int = 5\n\nf = Foo()\n#+END_SRC\n"))
+                   "#+BEGIN_SRC python\nclass Foo:\n    x: int = 5\n\nf = Foo()\n#+END_SRC"))
 
   ;; Without language
   (should (string= (jirassic--serialize-to-org
@@ -213,6 +239,51 @@
 (ert-deftest jirassic-serializer-test-fallback ()
   (should (string= (jirassic--serialize-to-org (make-jirassic-test--unsupported-node))
                    "###unsupported ADF node: jirassic-test--unsupported-node###")))
+
+;;; Utilities to help us test serializing larger issues from with
+;;; expected representations from org files.
+(defvar jirassic-serializer-test--fixtures-dir
+  (expand-file-name "fixtures"
+                    (file-name-directory (or load-file-name buffer-file-name))))
+
+(defun jirassic-serializer-test--output-should-match (expected actual)
+  "If EXPECTED and ACTUAL differ, signal an ERT failure with a unified diff."
+  (if noninteractive
+      ;; If running non-interactively, just compare normally.
+      (should (string= expected actual))
+    ;; If running interactively, then show the differences in a diff
+    ;; buffer to make it easy to debug.
+    (unless (string= expected actual)
+      (let* ((file-expected (make-temp-file "expected-" nil ".org" expected))
+             (file-actual   (make-temp-file "actual-"   nil ".org" actual))
+             (buf (diff-no-select file-expected file-actual)))
+        (unwind-protect
+            (progn
+              (with-current-buffer buf
+                (rename-buffer "*test-diff*" t)
+                (diff-mode))
+              (display-buffer buf)
+              (ert-fail "Output mismatch — see *test-diff* buffer"))
+          (delete-file file-expected)
+          (delete-file file-actual))))))
+
+(defun jirassic-serializer-test--read-fixture-alist (fixture-path)
+  "Read and eval an elisp fixture from FIXTURE-PATH.
+
+FIXTURE-PATH is relative to `jirassic-serializer-test--fixtures-dir'."
+  (let ((path (expand-file-name fixture-path jirassic-serializer-test--fixtures-dir)))
+    (with-temp-buffer
+      (insert-file-contents path)
+      (read (current-buffer)))))
+
+(defun jirassic-serializer-test--read-fixture-string (fixture-path)
+  "Read a fixture as a string from FIXTURE-PATH.
+
+FIXTURE-PATH is relative to `jirassic-serializer-test--fixtures-dir'."
+  (let ((path (expand-file-name fixture-path jirassic-serializer-test--fixtures-dir)))
+    (with-temp-buffer
+      (insert-file-contents path)
+      (buffer-string))))
 
 (provide 'jirassic-org-serializer-test)
 ;;; jirassic-org-serializer-test.el ends here
