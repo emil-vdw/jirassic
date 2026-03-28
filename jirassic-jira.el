@@ -30,21 +30,8 @@
 DESCRIPTION is an `adf-doc' node."
   id key summary description)
 
+;;; Root node
 (cl-defstruct adf-doc content)
-
-(cl-defstruct adf-heading
-  "Represents a heading in the document.
-
-LEVEL is an integer greater or equal to 1."
-  content level)
-
-(cl-defstruct adf-paragraph
-  "Container for a block of formatted text delineated by a carriage return.
-
-It's the equivalent of the HTML <p> tag.
-
-CONTENT must contain one or more inline objects."
-  content)
 
 ;;; Inline text objects
 (cl-defstruct adf-text
@@ -94,7 +81,7 @@ TEXT is optional and may be nil."
 URL contains the link and DATA is a JSONLD representation of the link.
 Either DATA or URL must be provided, but not both.
 
-Exampl DATA value:
+Example DATA value:
 '((@context . \"https://schema.org\")
   (@type . \"DigitalDocument\")
   (@id . \"https://mysite.atlassian.net/wiki/spaces/~123/pages/456\")
@@ -115,16 +102,66 @@ It's the equivalent to a <br/> in HTML.")
 
 TIMESTAMP is a unix timestamp of the date as a string."
   timestamp)
-;;; Inline ends here
-
-(cl-defstruct adf-rule
-  "A horizontal rule.")
 
 (cl-defstruct adf-emoji
   "An inline node that represents an emoji.
 
 TEXT contains the emoji to display"
   text)
+
+;;; Top-level block nodes
+;;;
+(cl-defstruct adf-heading
+  "Represents a heading in the document.
+
+LEVEL is an integer greater or equal to 1."
+  content level)
+
+(cl-defstruct adf-paragraph
+  "Container for a block of formatted text delineated by a carriage return.
+
+It's the equivalent of the HTML <p> tag.
+
+CONTENT must contain one or more inline objects."
+  content)
+
+(cl-defstruct adf-rule
+  "A horizontal rule.")
+
+(cl-defstruct adf-table
+  "Provides a container for the nodes that define a table.
+
+CONTENT takes an array of one or more `adf-table-row' nodes."
+  ;; The ADF table 'layout' and 'displayMode' properties are not supported.
+  content
+  is-numbere-columns-enabled)
+
+(cl-defstruct adf-table-row
+  "Rows within a table, a container for table heading and table cell nodes.
+
+CONTENT takes an array of one or more `adf-table-header' or `adf-table-cell' nodes."
+  content)
+
+(cl-defstruct adf-table-header
+  "Defines a cell within a table heading row.")
+
+(cl-defstruct adf-table-cell
+  "Defines a cell within a table row.
+
+content takes an array of one or more of these nodes:
+- `adf-blockquote'
+- `adf-bullet-list'
+- `adf-code-block'
+- `adf-heading'
+- `adf-media-group'
+- `adf-nested-expand'
+- `adf-ordered-list'
+- `adf-panel'
+- `adf-paragraph'
+- `adf-rule'
+
+The 'background' ADF table cell property is not supported."
+  content)
 
 (cl-defstruct adf-code-block
   "A container of lines of code.
@@ -144,7 +181,9 @@ LANGUAGE may be provided as a string, e.g. \"python\"."
 - `adf-media-single'"
   content)
 
-;;; Media objects
+(cl-defstruct adf-bullet-list content)
+(cl-defstruct adf-ordered-list content)
+
 (cl-defstruct adf-media-single
   "Container for one media item.
 
@@ -163,6 +202,7 @@ media item in full.
 CONTENT must contain one or more media nodes."
   content)
 
+;;; Child block nodes
 (cl-defstruct adf-media
   "Represents a single file or link stored in media services.
 
@@ -170,9 +210,6 @@ CONTENT must contain one or more media nodes."
 - `adf-media-group'
 - `adf-media-single'")
 
-;;; Lists
-(cl-defstruct adf-bullet-list content)
-(cl-defstruct adf-ordered-list content)
 (cl-defstruct adf-list-item
   "An item in a list.
 
@@ -199,15 +236,15 @@ content must contain at least one of the following nodes:
                    ;; adf-panel
                    adf-paragraph
                    adf-rule
-                   ;; adf-table
+                   adf-table
 
                    ;; Child block nodes:
                    adf-list-item
                    adf-media
                    ;; adf-nested-expand
-                   ;; adf-table-cell
-                   ;; adf-table-header
-                   ;; adf-table-row
+                   adf-table-cell
+                   adf-table-header
+                   adf-table-row
                    )))
 
 (cl-defgeneric jirassic-adjust-heading-level (obj amount)
@@ -242,6 +279,13 @@ positive values promote headings.")
     (setf (jira-issue-description new-issue)
           (jirassic-adjust-heading-level (jira-issue-description issue) amount))
     new-issue))
+
+(defun jirassic--content-contains-node (content node-types)
+  "Return t if CONTENT list contains one of NODE-TYPES."
+  ;; Check if any of the children in CONTENT have a type in NODE-TYPES.
+  (seq-some (lambda (child)
+              (seq-contains-p node-types (cl-type-of child) #'eq))
+            content))
 
 (provide 'jirassic-jira)
 ;;; jirassic-jira.el ends here

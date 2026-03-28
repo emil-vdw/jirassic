@@ -39,6 +39,17 @@
       ;; ((type . "inlineCard") (attrs (url . "https://acme.com")))
       ;; ((type . "inlineCard") (attrs (data (@context . "https://schema.org") ...)))
       ("inlineCard" (make-adf-inline-card :url .attrs.url :data .attrs.data))
+      ("table" (jirassic--parse-table node))
+      ;; ((type . "tableRow")
+      ;;  (content . [((type . "tableHeader") ...) ((type . "tableCell") ...)]))
+      ("tableRow" (make-adf-table-row :content (jirassic--parse-content-list .content)))
+      ;; ((type . "tableHeader")
+      ;;  (content . [((type . "paragraph") ...)]))
+      ;; Note: `adf-table-header' has no content slot; header cell content is not captured.
+      ("tableHeader" (make-adf-table-header))
+      ;; ((type . "tableCell")
+      ;;  (content . [((type . "paragraph") ...)]))
+      ("tableCell" (make-adf-table-cell :content (jirassic--parse-content-list .content)))
       (_ (warn "Unsupported ADF node type %s" .type)
          ;; Return `nil' so this unsupported node can be filtered out.
          nil))))
@@ -123,6 +134,26 @@ See the definition of `adf-code-block' for the constraints of
   (declare (pure t) (side-effect-free t))
   (let-alist paragraph
     (make-adf-paragraph :content (jirassic--parse-content-list .content))))
+
+(defun jirassic--parse-table (table)
+  "Create an `adf-table' object from a TABLE ADF node."
+  ;; Example ADF alist:
+  ;; ((type . "table")
+  ;;  (attrs (isNumberColumnEnabled . t))
+  ;;  (content
+  ;;   . [((type . "tableRow")
+  ;;       (content
+  ;;        . [((type . "tableHeader")
+  ;;            (content . [((type . "paragraph")
+  ;;                         (content . [((type . "text") (text . "Name"))]))]))
+  ;;           ((type . "tableCell")
+  ;;            (content . [((type . "paragraph")
+  ;;                         (content . [((type . "text") (text . "foo"))]))]))]))]))
+  (declare (pure t) (side-effect-free t))
+  (let-alist table
+    (make-adf-table
+     :content (jirassic--parse-content-list .content)
+     :is-numbere-columns-enabled .attrs.isNumberColumnEnabled)))
 
 (defun jirassic--parse-blockquote (blockquote)
   "Create an `adf-blockquote' object from a BLOCKQUOTE ADF node."

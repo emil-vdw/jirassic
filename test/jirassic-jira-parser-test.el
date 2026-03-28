@@ -222,6 +222,68 @@
     (should (string= (adf-text-text (car (adf-paragraph-content (car content))))
                      "List item text"))))
 
+(ert-deftest jirassic-parser-test-parse-table ()
+  (let* ((table
+          (jirassic--parse-table
+           '((type . "table")
+             (attrs (isNumberColumnEnabled . t))
+             (content
+              . [((type . "tableRow")
+                  (content
+                   . [((type . "tableHeader")
+                       (content . [((type . "paragraph")
+                                    (content . [((type . "text") (text . "Name"))]))]))
+                      ((type . "tableCell")
+                       (content . [((type . "paragraph")
+                                    (content . [((type . "text") (text . "foo"))]))]))]))]))))
+         (rows (adf-table-content table)))
+    (should (cl-typep table 'adf-table))
+    (should (eq (adf-table-is-numbere-columns-enabled table) t))
+    (should (= (length rows) 1))
+    (let ((cells (adf-table-row-content (car rows))))
+      (should (cl-typep (nth 0 cells) 'adf-table-header))
+      (should (cl-typep (nth 1 cells) 'adf-table-cell))
+      (should (string= (adf-text-text
+                        (car (adf-paragraph-content
+                              (car (adf-table-cell-content (nth 1 cells))))))
+                       "foo")))))
+
+(ert-deftest jirassic-parser-test-parse-table-row ()
+  (let* ((row (jirassic-parse-adf-node
+               '((type . "tableRow")
+                 (content
+                  . [((type . "tableCell")
+                      (content . [((type . "paragraph")
+                                   (content . [((type . "text") (text . "A"))]))]))
+                     ((type . "tableCell")
+                      (content . [((type . "paragraph")
+                                   (content . [((type . "text") (text . "B"))]))]))]))))
+         (cells (adf-table-row-content row)))
+    (should (cl-typep row 'adf-table-row))
+    (should (= (length cells) 2))
+    (should (cl-typep (nth 0 cells) 'adf-table-cell))
+    (should (cl-typep (nth 1 cells) 'adf-table-cell))))
+
+(ert-deftest jirassic-parser-test-parse-table-header ()
+  ;; adf-table-header has no content slot; verify it parses without error
+  (let ((header (jirassic-parse-adf-node
+                 '((type . "tableHeader")
+                   (content . [((type . "paragraph")
+                                (content . [((type . "text") (text . "Col"))]))])))))
+    (should (cl-typep header 'adf-table-header))))
+
+(ert-deftest jirassic-parser-test-parse-table-cell ()
+  (let* ((cell (jirassic-parse-adf-node
+                '((type . "tableCell")
+                  (content . [((type . "paragraph")
+                               (content . [((type . "text") (text . "hello"))]))]))))
+         (content (adf-table-cell-content cell)))
+    (should (cl-typep cell 'adf-table-cell))
+    (should (= (length content) 1))
+    (should (cl-typep (car content) 'adf-paragraph))
+    (should (string= (adf-text-text (car (adf-paragraph-content (car content))))
+                     "hello"))))
+
 (ert-deftest jirassic-parser-test-parse-inline-card ()
   ;; URL variant
   (let ((card (jirassic-parse-adf-node '((type . "inlineCard")
