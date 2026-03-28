@@ -43,13 +43,12 @@
       ;; ((type . "tableRow")
       ;;  (content . [((type . "tableHeader") ...) ((type . "tableCell") ...)]))
       ("tableRow" (make-adf-table-row :content (jirassic--parse-content-list .content)))
-      ;; ((type . "tableHeader")
-      ;;  (content . [((type . "paragraph") ...)]))
-      ;; Note: `adf-table-header' has no content slot; header cell content is not captured.
-      ("tableHeader" (make-adf-table-header))
-      ;; ((type . "tableCell")
-      ;;  (content . [((type . "paragraph") ...)]))
-      ("tableCell" (make-adf-table-cell :content (jirassic--parse-content-list .content)))
+      ("tableHeader" (make-adf-table-header
+                      :content (jirassic--parse-content-list .content)
+                      :row-span .attrs.rowspan :col-span .attrs.colspan))
+      ("tableCell" (make-adf-table-cell
+                    :content (jirassic--parse-content-list .content)
+                    :row-span .attrs.rowspan :col-span .attrs.colspan))
       (_ (warn "Unsupported ADF node type %s" .type)
          ;; Return `nil' so this unsupported node can be filtered out.
          nil))))

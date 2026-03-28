@@ -95,7 +95,7 @@ LEVEL is ignored because `adf-text' is an inline node, so only its
 parent container will consider indentation.
 
 Only applies the first supported mark because of org syntax limitations."
-  (declare (pure t) (side-effect-free t))
+  (declare (pure t))
   (let (;; Get the first mark that is supported by the serializer (if any).
         (mark (car (seq-filter
                     (lambda (mark) (member (adf-mark-type mark)
@@ -250,10 +250,60 @@ Formats to a date without time components."
 
 ;;; `adf-blockquote'
 (cl-defmethod jirassic--serialize-to-org ((blockquote adf-blockquote) &optional _level)
-  "Serialise BLOCKQUOTE to an org mode quote block."
+  "Serialise BLOCKQUOTE to an `org-mode' quote block."
   (declare (pure t) (side-effect-free t))
   (format "\n#+BEGIN_QUOTE\n%s\n#+END_QUOTE\n"
           (jirassic-serializer--serialize-content-list (adf-blockquote-content blockquote))))
+
+;;; `adf-table'
+(cl-defmethod jirassic--serialize-to-org ((table adf-table) &optional _level)
+  "Serialize TABLE into an `org-mode' table.
+
+Because of the limitations of `org-mode' tables compared to Atlassian
+tables, like cells that span multiple columns or rows, or cells that
+contain nested expands. If the table is an unsupported configuration,
+return a placeholder."
+  (declare (pure t))
+  (let* ((rows (adf-table-content table))
+         ;; Flat list of cells (header or normal) in all rows
+         (cells (mapcan #'adf-table-row-content rows)))
+    (if-let ((reason (seq-some
+                      #'jirassic-serializer--table-cell-content-unsupported
+                      cells)))
+        (progn (warn "Cannot serialize table, it has a cell that %s" reason)
+               (cl-call-next-method)))))
+
+(defun jirassic-serializer--table-cell-content-unsupported (cell)
+  "If table CELL is unsupported, return a reason.
+
+A Cell is unsupported if:
+1. It spans multiple columns or rows.
+2. It contains a block node that cannot represented in an org table."
+  (let (;; Nodes that are not supported inside table cells. See
+        ;; `adf-table-cell' and `adf-table-header' for more info.
+        (unsupported-nodes '(adf-blockquote
+                             adf-bullet-list
+                             adf-code-block
+                             adf-heading
+                             adf-media-group
+                             adf-nested-expand
+                             adf-ordered-list
+                             adf-panel
+                             adf-rule)))
+   (cond
+    ((cl-typecase cell
+       (adf-table-cell   (or (adf-table-header-row-span cell)
+                             (adf-table-header-col-span cell)))
+       (adf-table-header (or (adf-table-cell-row-span cell)
+                             (adf-table-cell-col-span cell))))
+     "spans multiple rows or columns")
+
+    ((jirassic--content-contains-node
+      (cl-typecase cell
+        (adf-table-cell (adf-table-cell-content cell))
+        (adf-table-header (adf-table-header-content cell)))
+      unsupported-nodes)
+     "contains an unsupported block node"))))
 
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.

@@ -143,7 +143,23 @@ CONTENT takes an array of one or more `adf-table-header' or `adf-table-cell' nod
   content)
 
 (cl-defstruct adf-table-header
-  "Defines a cell within a table heading row.")
+  "Defines a cell within a table heading row.
+
+content takes an array of one or more of these nodes:
+- `adf-blockquote'
+- `adf-bullet-list'
+- `adf-code-block'
+- `adf-heading'
+- `adf-media-group'
+- `adf-nested-expand'
+- `adf-ordered-list'
+- `adf-panel'
+- `adf-paragraph'
+- `adf-rule'
+
+The 'background' and 'colwidth' ADF table cell property are not
+supported."
+  content row-span col-span)
 
 (cl-defstruct adf-table-cell
   "Defines a cell within a table row.
@@ -161,7 +177,7 @@ content takes an array of one or more of these nodes:
 - `adf-rule'
 
 The 'background' ADF table cell property is not supported."
-  content)
+  content row-span col-span)
 
 (cl-defstruct adf-code-block
   "A container of lines of code.
@@ -281,8 +297,7 @@ positive values promote headings.")
     new-issue))
 
 (defun jirassic--content-contains-node (content node-types)
-  "Return t if CONTENT list contains one of NODE-TYPES."
-  ;; Check if any of the children in CONTENT have a type in NODE-TYPES.
+  "Return node type if that node in CONTENT has a type in NODE-TYPES."
   (seq-some (lambda (child)
               (seq-contains-p node-types (cl-type-of child) #'eq))
             content))
