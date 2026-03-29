@@ -24,6 +24,14 @@ that takes the indentation level as an argument and returns one of those charact
                  (function :tag "Function (level -> char)"))
   :group 'jirassic)
 
+(defcustom jirassic-blank-line-between-headings
+  (not (null (alist-get 'heading
+                        org-blank-before-new-entry)))
+  "Whether sibling headings are serialized with a blank line in between them.
+
+Defaults to the value of heading in `org-blank-before-new-entry', t if
+set to auto or t.")
+
 (defvar jirassic-serializer--supported-marks
   '(code em link strike strong subsup underline)
   "The type of text marks supported by `jirassic--serialize-to-org'.")
@@ -198,8 +206,7 @@ its parent container will consider indentation."
 (cl-defmethod jirassic--serialize-to-org ((ordered-list adf-ordered-list) &optional level)
   "Convert ORDERED-LIST to an org mode string at LEVEL."
   (declare (pure t) (side-effect-free t))
-  (mapconcat
-   'identity
+  (jirassic--s-join
    (seq-map-indexed
     (lambda (list-item index)
       (format "%s%d. %s"
@@ -266,12 +273,85 @@ return a placeholder."
   (declare (pure t))
   (let* ((rows (adf-table-content table))
          ;; Flat list of cells (header or normal) in all rows
-         (cells (mapcan #'adf-table-row-content rows)))
+         (cells (apply #'append (mapcar #'adf-table-row-content rows))))
     (if-let ((reason (seq-some
                       #'jirassic-serializer--table-cell-content-unsupported
                       cells)))
         (progn (warn "Cannot serialize table, it has a cell that %s" reason)
-               (cl-call-next-method)))))
+               (cl-call-next-method))
+      (let* (;; We get a two dimensional list of serialized cell
+             ;; contents first so we can determine the column widths.
+             (serialized-rows (jirassic--table-serialize-row-contents rows))
+             (serialized-columns (apply #'cl-mapcar #'list serialized-rows))
+             (column-widths
+              (mapcar #'jirassic--column-min-width serialized-columns)))
+        (concat
+         ;; Header content
+         (jirassic--format-table-row (nth 0 serialized-rows) column-widths)
+         ;; Header seperator
+         "\n" (jirassic--table-header-seperator column-widths) "\n"
+         ;; Table content
+         (mapconcat (lambda (row) (jirassic--format-table-row row column-widths))
+                    (cdr serialized-rows) "\n"))))))
+
+(defun jirassic--table-serialize-row-contents (rows)
+  ""
+  (mapcar
+   (lambda (row)
+     (mapcar
+      (lambda (cell)
+        (mapconcat #'jirassic--serialize-to-org
+                   (if (cl-typep cell 'adf-table-header)
+                       (adf-table-header-content cell)
+                     (adf-table-cell-content cell))))
+      (adf-table-row-content row)))
+   rows))
+
+(defun jirassic--table-header-seperator (column-widths)
+  "Create a table header separator for header columns with COLUMN-WIDTHS."
+  (concat
+   "|"
+   (mapconcat (lambda (width)
+                (jirassic--string-repeat
+                 ;; The width of the cell does not include the space
+                 ;; before and after the cell contents that separate
+                 ;; the cell from the column divider.
+                 (+ width 2)
+                 "-"))
+              column-widths
+              "+")
+   "|"))
+
+(defun jirassic--format-table-row (row-content column-widths)
+  "Format serialized ROW-CONTENT int a row with COLUMN-WIDTHS."
+  (let ((padded-row-content
+         (cl-mapcar (lambda (serialized-cell width)
+                      (jirassic--pad-table-cell serialized-cell width))
+                    row-content column-widths)))
+   (concat "| "
+           (jirassic--s-join " | " padded-row-content)
+           " |")))
+
+(defun jirassic--pad-table-cell (serialized-content width)
+  "Pad SERIALIZED-CONTENT with whitespace so it is WIDTH chars wide.
+
+Only supports left aligned cells (`org-mode' limitation)."
+  (declare (pure t) (side-effect-free t))
+  (let ((padding (- width (length serialized-content))))
+    (concat serialized-content
+            (jirassic--string-repeat padding " "))))
+
+(defun jirassic--column-min-width (column)
+  "Determine the min width needed for all values in COLUMN."
+  ;; TODO: take into account `org-hide-emphasis-markers'. This changes
+  ;; the width of the column when there are hidden characters.
+  (declare (pure t) (side-effect-free t))
+  (+ 2 (apply #'max (mapcar #'length column))))
+
+(defun jirassic--s-join (separator strings)
+  "Join all the strings in STRINGS with SEPARATOR in between."
+  (declare (pure t) (side-effect-free t))
+  (mapconcat 'identity strings separator))
 
 (defun jirassic-serializer--table-cell-content-unsupported (cell)
   "If table CELL is unsupported, return a reason.
@@ -290,20 +370,20 @@ A Cell is unsupported if:
                              adf-ordered-list
                              adf-panel
                              adf-rule)))
-   (cond
-    ((cl-typecase cell
-       (adf-table-cell   (or (adf-table-header-row-span cell)
-                             (adf-table-header-col-span cell)))
-       (adf-table-header (or (adf-table-cell-row-span cell)
-                             (adf-table-cell-col-span cell))))
-     "spans multiple rows or columns")
+    (cond
+     ((cl-typecase cell
+        (adf-table-header   (or (adf-table-header-row-span cell)
+                              (adf-table-header-col-span cell)))
+        (adf-table-cell (or (adf-table-cell-row-span cell)
+                              (adf-table-cell-col-span cell))))
+      "spans multiple rows or columns")
 
-    ((jirassic--content-contains-node
-      (cl-typecase cell
-        (adf-table-cell (adf-table-cell-content cell))
-        (adf-table-header (adf-table-header-content cell)))
-      unsupported-nodes)
-     "contains an unsupported block node"))))
+     ((jirassic--content-contains-node
+       (cl-typecase cell
+         (adf-table-cell (adf-table-cell-content cell))
+         (adf-table-header (adf-table-header-content cell)))
+       unsupported-nodes)
+      "contains an unsupported block node"))))
 
 (defun jirassic-serializer--split-whitespace (string)
   "Split STRING in leading whitespace, center string and trailing spaces.
@@ -333,23 +413,17 @@ Example:
                          (jirassic-jira-block-node-p next-node))
                 (cond
                  ((and (adf-heading-p cur-node) (adf-heading-p next-node))
-                  ;; For subsequent headings, add an extra newline if
-                  ;; they are on the same level (siblings) but only a
-                  ;; single newline between a parent and child
-                  ;; heading.
-                  ;;
-                  ;; TODO: make this customizable via a `defcustom'
-                  ;; (defaults from `org-blank-before-new-entry'?)
-                  (if (eq (adf-heading-level cur-node) (adf-heading-level next-node))
+                  ;; We want an extra newline between sibling headings.
+                  (if (and (eq (adf-heading-level cur-node) (adf-heading-level next-node))
+                           jirassic-blank-line-between-headings)
                       "\n\n"
                     "\n"))
-                 ;; After any other block node and before a heading,
-                 ;; put two newlines.
-                 ((adf-heading-p next-node) "\n\n")
-                 ;; Between a horizontal rule and any other block
-                 ;; node, insert two newlines.
-                 ((or (and (adf-rule-p cur-node) (not (null next-node)))
-                      (and (adf-rule-p next-node) (not (null cur-node))))
+
+                 ;; Two newlines between a horizontal rule or a
+                 ;; heading and any other block node.
+                 ((or (adf-heading-p next-node)
+                      (adf-rule-p cur-node)
+                      (adf-rule-p next-node))
                   "\n\n")
                  (t "\n")))))
     ;; Loop over two nodes at a time, the current and next node, so we

@@ -233,6 +233,34 @@
                                      :content (list (make-adf-text :text "Section"))))))
                    "Intro\n\n* Section")))
 
+;;; Test serializing content lists
+(ert-deftest jirassic-serializer-test-content-line-between-headings ()
+  "Test serializing content of a node containing headings."
+  ;; Sibling headings respect `jirassic-blank-line-between-headings'
+  (let ((content (list (make-adf-heading :content (list (make-adf-text :text "sibling1"))
+                                         :level 1)
+                       (make-adf-heading :content (list (make-adf-text :text "sibling2"))
+                                         :level 1))))
+    (let ((jirassic-blank-line-between-headings t))
+      (should
+       (string= (jirassic-serializer--serialize-content-list content)
+                "* sibling1\n\n* sibling2")))
+
+    (let ((jirassic-blank-line-between-headings nil))
+      (should
+       (string= (jirassic-serializer--serialize-content-list content)
+                "* sibling1\n* sibling2"))))
+
+  ;; Child headings have no blank line between them and the parent.
+  (let ((content (list (make-adf-heading :content (list (make-adf-text :text "parent"))
+                                         :level 1)
+                       (make-adf-heading :content (list (make-adf-text :text "child"))
+                                         :level 2))))
+    (let ((jirassic-blank-line-between-headings t))
+      (should
+       (string= (jirassic-serializer--serialize-content-list content)
+                "* parent\n* child")))))
+
 ;;; fallback serializer
 (cl-defstruct jirassic-test--unsupported-node)
 
