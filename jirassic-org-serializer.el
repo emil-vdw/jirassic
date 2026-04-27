@@ -380,7 +380,8 @@ Tables with celss that span multiple rows or columns are not supported."
             (adf-table-cell (adf-table-cell-content cell))
             (adf-table-header (adf-table-header-content cell)))
           unsupported-nodes)
-         "contains an unsupported block node"))))))
+         "contains an unsupported block node")))
+     cells)))
 
 (defun jirassic-serializer--table-cell-content-unsupported (cell)
   "If table CELL is unsupported, return a reason.
