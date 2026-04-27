@@ -274,6 +274,7 @@ return a placeholder."
   (declare (pure t))
   (if-let ((reason-unsupported (jirassic-serializer--table-unsupported table)))
       (progn (warn "Cannot serialize table, it has a cell that %s" reason-unsupported)
+             ;; Fall back to the default handler that will return a placeholder.
              (cl-call-next-method))
     (let* (;; We get a two dimensional list of serialized cell
            ;; contents first so we can determine the column widths.

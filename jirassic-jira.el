@@ -260,8 +260,7 @@ content must contain at least one of the following nodes:
                    ;; adf-nested-expand
                    adf-table-cell
                    adf-table-header
-                   adf-table-row
-                   )))
+                   adf-table-row)))
 
 (cl-defgeneric jirassic-adjust-heading-level (obj amount)
   "Recursively promote or demote all headings in OBJ by AMOUNT.
