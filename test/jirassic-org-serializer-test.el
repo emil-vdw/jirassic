@@ -262,6 +262,74 @@
        (string= (jirassic-serializer--serialize-content-list content)
                 "* parent\n** child")))))
 
+;;; `adf-table'
+(ert-deftest jirassic-serializer-test-table-plain ()
+  "Table with plain text cells serializes to a correctly padded org table."
+  (let ((table
+         (make-adf-table
+          :content
+          (list (make-adf-table-row
+                 :content
+                 (list (make-adf-table-header
+                        :content (list (make-adf-paragraph
+                                        :content (list (make-adf-text :text "Name")))))
+                       (make-adf-table-header
+                        :content (list (make-adf-paragraph
+                                        :content (list (make-adf-text :text "Value")))))))
+                (make-adf-table-row
+                 :content
+                 (list (make-adf-table-cell
+                        :content (list (make-adf-paragraph
+                                        :content (list (make-adf-text :text "foo")))))
+                       (make-adf-table-cell
+                        :content (list (make-adf-paragraph
+                                        :content (list (make-adf-text :text "bar")))))))))))
+    (should (string= (jirassic--serialize-to-org table)
+                     (concat "| Name   | Value   |\n"
+                             "|--------+---------|\n"
+                             "| foo    | bar     |")))))
+
+(ert-deftest jirassic-serializer-test-table-emphasis-column-width ()
+  "Table column widths account for `org-hide-emphasis-markers'.
+
+With markers visible the emphasis chars count toward the column width.
+With markers hidden the column is sized to the visible text and cells get
+extra padding to compensate for the hidden marker characters."
+  (let* ((bold-mark (list (make-adf-mark :type 'strong)))
+         (table
+          (make-adf-table
+           :content
+           (list (make-adf-table-row
+                  :content
+                  (list (make-adf-table-header
+                         :content (list (make-adf-paragraph
+                                         :content (list (make-adf-text :text "Name")))))
+                        (make-adf-table-header
+                         :content (list (make-adf-paragraph
+                                         :content (list (make-adf-text :text "Bold")))))))
+                 (make-adf-table-row
+                  :content
+                  (list (make-adf-table-cell
+                         :content (list (make-adf-paragraph
+                                         :content (list (make-adf-text :text "foo")))))
+                        (make-adf-table-cell
+                         :content (list (make-adf-paragraph
+                                         :content (list (make-adf-text :text "bar"
+                                                                        :marks bold-mark)))))))))))
+    ;; Markers visible: *bar* is 5 chars, so col2 width = max(4,5)+2 = 7.
+    (let ((org-hide-emphasis-markers nil))
+      (should (string= (jirassic--serialize-to-org table)
+                       (concat "| Name   | Bold    |\n"
+                               "|--------+---------|\n"
+                               "| foo    | *bar*   |"))))
+    ;; Markers hidden: *bar* is 3 chars, so col2 width = max(4,3)+2 = 6.
+    ;; The *bar* cell gets 3 spaces of padding (to fill 6 visible chars) rather than 2.
+    (let ((org-hide-emphasis-markers t))
+      (should (string= (jirassic--serialize-to-org table)
+                       (concat "| Name   | Bold   |\n"
+                               "|--------+--------|\n"
+                               "| foo    | *bar*    |"))))))
+
 ;;; fallback serializer
 (cl-defstruct jirassic-test--unsupported-node)
 
