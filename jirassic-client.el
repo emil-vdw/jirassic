@@ -12,6 +12,7 @@
 
 (require 'aio)
 (require 'plz)
+(require 'jirassic-jira-parser)
 
 (defcustom jirassic-host nil
   "Jira host URL."
@@ -19,7 +20,7 @@
   :group 'jirassic)
 
 (defun jirassic-get-issue (issue-key)
-  "Asynchronously fetch a Jira issue by ISSUE-KEY and resolve JSON data."
+  "Asynchronously fetch a Jira issue by ISSUE-KEY and resolve a `jira-issue' struct."
   (let ((promise (aio-promise))
         (issue-url (string-join
                     (list (jirassic--jira-api-url) "issue" issue-key) "/")))
@@ -27,7 +28,7 @@
       :headers (jirassic-client--headers (jirassic-client--credentials))
       :as #'json-read
       ;; When the request is successful, just resolve the promise with the parsed JSON data,
-      :then (lambda (data) (aio-resolve promise (lambda () data)))
+      :then (lambda (data) (aio-resolve promise (lambda () (jirassic--parse-issue data))))
       ;; otherwise just signal the error.
       :else (lambda (err) (aio-resolve promise (lambda () (signal (car err) (cdr err))))))
     promise))
