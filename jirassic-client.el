@@ -34,7 +34,7 @@
 
 (defun jirassic--jira-api-url ()
   "Returns the Jira Rest API URL for JIRASSIC-HOST."
-  (s-concat (s-chop-suffix "/" (jirassic--host)) "/rest/api/3"))
+  (concat (string-remove-suffix "/" (jirassic--host)) "/rest/api/3"))
 
 (defun jirassic-client--credentials ()
   "API credentials for JIRASSIC-HOST."
