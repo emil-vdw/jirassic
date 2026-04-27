@@ -7,6 +7,7 @@
 
 ;;; Code:
 (require 'cl-lib)
+(require 'org)
 
 (require 'jirassic-jira)
 
@@ -271,39 +272,32 @@ tables, like cells that span multiple columns or rows, or cells that
 contain nested expands. If the table is an unsupported configuration,
 return a placeholder."
   (declare (pure t))
-  (let* ((rows (adf-table-content table))
-         ;; Flat list of cells (header or normal) in all rows
-         (cells (apply #'append (mapcar #'adf-table-row-content rows))))
-    (if-let ((reason (seq-some
-                      #'jirassic-serializer--table-cell-content-unsupported
-                      cells)))
-        (progn (warn "Cannot serialize table, it has a cell that %s" reason)
-               (cl-call-next-method))
-      (let* (;; We get a two dimensional list of serialized cell
-             ;; contents first so we can determine the column widths.
-             (serialized-rows (jirassic--table-serialize-row-contents rows))
-             (serialized-columns (apply #'cl-mapcar #'list serialized-rows))
-             (column-widths
-              (mapcar #'jirassic--column-min-width serialized-columns)))
-        (concat
-         ;; Header content
-         (jirassic--format-table-row (nth 0 serialized-rows) column-widths)
-         ;; Header seperator
-         "\n" (jirassic--table-header-seperator column-widths) "\n"
-         ;; Table content
-         (mapconcat (lambda (row) (jirassic--format-table-row row column-widths))
-                    (cdr serialized-rows) "\n"))))))
+  (if-let ((reason-unsupported (jirassic-serializer--table-unsupported table)))
+      (progn (warn "Cannot serialize table, it has a cell that %s" reason-unsupported)
+             (cl-call-next-method))
+    (let* (;; We get a two dimensional list of serialized cell
+           ;; contents first so we can determine the column widths.
+           (serialized-rows (jirassic--table-serialize-row-contents (adf-table-content table)))
+           (serialized-columns (apply #'cl-mapcar #'list serialized-rows))
+           (column-widths
+            (mapcar #'jirassic--column-min-width serialized-columns)))
+      (concat
+       ;; Header content
+       (jirassic--format-table-row (nth 0 serialized-rows) column-widths)
+       ;; Header seperator
+       "\n" (jirassic--table-header-seperator column-widths) "\n"
+       ;; Table content
+       (mapconcat (lambda (row) (jirassic--format-table-row row column-widths))
+                  (cdr serialized-rows) "\n")))))
 
 (defun jirassic--table-serialize-row-contents (rows)
-  ""
+  "Serialize each cell of each row in ROWS to an org string."
   (mapcar
    (lambda (row)
      (mapcar
       (lambda (cell)
         (mapconcat #'jirassic--serialize-to-org
-                   (if (cl-typep cell 'adf-table-header)
-                       (adf-table-header-content cell)
-                     (adf-table-cell-content cell))))
+                   (jirassic--table-cell-content cell)))
       (adf-table-row-content row)))
    rows))
 
@@ -329,7 +323,7 @@ return a placeholder."
                       (jirassic--pad-table-cell serialized-cell width))
                     row-content column-widths)))
    (concat "| "
-           (jirassic--s-join " | " padded-row-content)
+           (jirassic--s-join padded-row-content " | ")
            " |")))
 
 (defun jirassic--pad-table-cell (serialized-content width)
@@ -348,10 +342,44 @@ Only supports left aligned cells (`org-mode' limitation)."
   (declare (pure t) (side-effect-free t))
   (+ 2 (apply #'max (mapcar #'length column))))
 
-(defun jirassic--s-join (separator strings)
+(defun jirassic--s-join (strings separator)
   "Join all the strings in STRINGS with SEPARATOR in between."
   (declare (pure t) (side-effect-free t))
   (mapconcat 'identity strings separator))
+
+(defun jirassic-serializer--table-unsupported (table)
+  "Return reason TABLE is unsupported or nil if supported.
+
+Some nodes are not supported inside (org) tables that work just fine in
+ADF tables because of org table limitations.
+
+Tables with celss that span multiple rows or columns are not supported."
+  (let* ((unsupported-nodes '(adf-blockquote
+                              adf-bullet-list
+                              adf-code-block
+                              adf-heading
+                              adf-media-group
+                              adf-nested-expand
+                              adf-ordered-list
+                              adf-panel
+                              adf-rule))
+         (cells (apply #'append (mapcar #'adf-table-row-content (adf-table-content table)))))
+    (seq-some
+     (lambda (cell)
+       (cond
+        ((cl-typecase cell
+           (adf-table-header   (or (adf-table-header-row-span cell)
+                                   (adf-table-header-col-span cell)))
+           (adf-table-cell (or (adf-table-cell-row-span cell)
+                               (adf-table-cell-col-span cell))))
+         "spans multiple rows or columns")
+
+        ((jirassic--content-contains-node
+          (cl-typecase cell
+            (adf-table-cell (adf-table-cell-content cell))
+            (adf-table-header (adf-table-header-content cell)))
+          unsupported-nodes)
+         "contains an unsupported block node"))))))
 
 (defun jirassic-serializer--table-cell-content-unsupported (cell)
   "If table CELL is unsupported, return a reason.

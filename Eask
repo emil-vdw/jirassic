@@ -25,6 +25,7 @@
 (depends-on "aio" "1.0")
 (depends-on "plz" "	0.9.1")
 (depends-on "org" "9.5")
+(depends-on "seq" "2.24")
 
 ;;; Configure linters
 (setq sentence-end-double-space nil)

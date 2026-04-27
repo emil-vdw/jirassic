@@ -269,6 +269,17 @@ content must contain at least one of the following nodes:
 AMOUNT may be a positive or negative integer, negative values demote and
 positive values promote headings.")
 
+(cl-defgeneric jirassic--table-cell-content (cell)
+  "Return the content nodes of a table CELL.")
+
+(cl-defmethod jirassic--table-cell-content ((header adf-table-header))
+  "Return the contents of table HEADER."
+  (adf-table-header-content header))
+
+(cl-defmethod jirassic--table-cell-content ((cell adf-table-cell))
+  "Return the contents of table CELL."
+  (adf-table-cell-content cell))
+
 (cl-defmethod jirassic-adjust-heading-level ((node t) _amount)
   "NODE should not contain any headings, return as is."
   node)

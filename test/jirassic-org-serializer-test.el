@@ -63,11 +63,11 @@
 (ert-deftest jirassic-serializer-test-bullet-list ()
   (let ((bullet-list (make-adf-bullet-list
                       :content (list (make-adf-list-item
-                                      :content (make-adf-text :text "first bullet"))
+                                      :content (list (make-adf-text :text "first bullet")))
                                      (make-adf-list-item
-                                      :content (make-adf-text :text "second bullet"))
+                                      :content (list (make-adf-text :text "second bullet")))
                                      (make-adf-list-item
-                                      :content (make-adf-text :text "third bullet"))))))
+                                      :content (list (make-adf-text :text "third bullet")))))))
     (should (string= (jirassic--serialize-to-org bullet-list)
                      "- first bullet\n- second bullet\n- third bullet"))))
 
@@ -159,21 +159,22 @@
   (should (string= (jirassic--serialize-to-org
                     (make-adf-code-block
                      :content (list (make-adf-text :text "hello"))))
-                   "#+BEGIN_SRC\nhello\n#+END_SRC\n"))
+                   "#+BEGIN_SRC\nhello\n#+END_SRC"))
 
   ;; Empty string language treated as omitted
   (should (string= (jirassic--serialize-to-org
                     (make-adf-code-block
                      :language ""
                      :content (list (make-adf-text :text "hello"))))
-                   "#+BEGIN_SRC\nhello\n#+END_SRC\n"))
+                   "#+BEGIN_SRC\nhello\n#+END_SRC"))
 
   ;; Language "none"
   (should (string= (jirassic--serialize-to-org
                     (make-adf-code-block
                      :language "none"
                      :content (list (make-adf-text :text "hello"))))
-                   "#+BEGIN_SRC\nhello\n#+END_SRC\n")))
+                   "#+BEGIN_SRC\nhello\n#+END_SRC")))
+
 ;;; `adf-paragraph'
 (ert-deftest jirassic-serializer-test-paragraph ()
   ;; Plain text content
@@ -259,7 +260,7 @@
     (let ((jirassic-blank-line-between-headings t))
       (should
        (string= (jirassic-serializer--serialize-content-list content)
-                "* parent\n* child")))))
+                "* parent\n** child")))))
 
 ;;; fallback serializer
 (cl-defstruct jirassic-test--unsupported-node)
