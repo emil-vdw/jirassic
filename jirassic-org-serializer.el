@@ -37,6 +37,13 @@ set to auto or t.")
   '(code em link strike strong subsup underline)
   "The type of text marks supported by `jirassic--serialize-to-org'.")
 
+(defvar jirassic-serializer--heading-unsupported-marks
+  '(code em strike strong subsup underline)
+  "Text marks that must be stripped when serializing `org-mode' heading text.
+
+Org-mode does not apply these emphasis markers inside headings at, the
+characters are displayed verbatim rather than as formatting.")
+
 (cl-defgeneric jirassic--serialize-to-org (node &optional level)
   "Serialize NODE to an `org-mode' string at heading LEVEL.")
 
@@ -80,15 +87,37 @@ set to auto or t.")
   (jirassic-serializer--serialize-content-list (adf-doc-content doc)))
 
 ;;; `adf-heading'
-(cl-defmethod jirassic--serialize-to-org ((heading adf-heading) &optional level)
-  "Convert HEADING to an org mode string at LEVEL."
-  (declare (pure t) (side-effect-free t))
-  (let ((stars (adf-heading-level heading)))
-    (format "%s %s"
-            (jirassic--string-repeat stars "*")
-            (mapconcat (lambda (heading-part)
-                         (jirassic--serialize-to-org heading-part level))
-                       (adf-heading-content heading)))))
+(cl-defmethod jirassic--serialize-to-org ((heading adf-heading) &optional _level)
+  "Convert HEADING to an org mode string.
+
+For `adf-text' nodes in the heading content, marks listed in
+`jirassic-serializer--heading-unsupported-marks' are stripped before
+serialization."
+  (format "%s %s"
+          (jirassic--string-repeat (adf-heading-level heading) "*")
+          (mapconcat
+           (lambda (content)
+             (cl-typecase content
+               (adf-text
+                (let* ((marks (adf-text-marks content))
+                       (unsupported (seq-filter
+                                     (lambda (mark)
+                                       (memq (adf-mark-type mark)
+                                             jirassic-serializer--heading-unsupported-marks))
+                                     marks)))
+                  (when unsupported
+                    (warn "Dropping mark(s) %s from heading text: not supported in org headings"
+                          (mapcar #'adf-mark-type unsupported)))
+                  (jirassic--serialize-to-org
+                   (make-adf-text
+                    :text (adf-text-text content)
+                    :marks (seq-remove
+                            (lambda (mark)
+                              (memq (adf-mark-type mark)
+                                    jirassic-serializer--heading-unsupported-marks))
+                            marks)))))
+               (t (jirassic--serialize-to-org content))))
+           (adf-heading-content heading))))
 
 ;;; `adf-paragraph'
 (cl-defmethod jirassic--serialize-to-org ((paragraph adf-paragraph) &optional _level)

@@ -207,13 +207,32 @@
                      :content (list (make-adf-text :text "Subsection"))))
                    "** Subsection"))
 
-  ;; Content with a mark
+  ;; Emphasis marks are stripped from heading text — org-mode does not apply
+  ;; them inside headings and `strong' would conflict with the `*' heading stars.
   (should (string= (jirassic--serialize-to-org
                     (make-adf-heading
                      :level 3
                      :content (list (make-adf-text :text "Emphasized"
                                                    :marks (list (make-adf-mark :type 'em))))))
-                   "*** /Emphasized/")))
+                   "*** Emphasized"))
+
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-heading
+                     :level 2
+                     :content (list (make-adf-text :text "Bold"
+                                                   :marks (list (make-adf-mark :type 'strong))))))
+                   "** Bold"))
+
+  ;; Links are kept — [[url][desc]] is valid inside an org heading.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-heading
+                     :level 1
+                     :content (list (make-adf-text
+                                     :text "Click here"
+                                     :marks (list (make-adf-mark
+                                                   :type 'link
+                                                   :attrs '((href . "https://acme.com"))))))))
+                   "* [[https://acme.com][Click here]]")))
 
 ;;; `adf-doc'
 (ert-deftest jirassic-serializer-test-doc ()
