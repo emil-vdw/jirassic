@@ -52,14 +52,18 @@
   (let* ((issue (aio-await (jirassic-get-issue issue-key))))
     (insert (jirassic--serialize-to-org issue))))
 
-(defun jirassic-org--build-property-drawer (props)
-  "Build an org property drawer string with PROPS."
-  (concat
-   ":PROPERTIES:\n"
-   (mapconcat (pcase-lambda (`(,prop-name ,prop-val))
-                (format ":%s: %s" prop-name prop-val))
-              props "\n")
-   "\n:END:"))
+(defun jirassic-org--issue-properties (issue &optional extra-props)
+  "Return an org property drawer for Jira ISSUE.
+
+EXTRA-PROPS can be an alist of extra properties to include in the drawer."
+  (let ((issue-props `(("issue-id" ,(jira-issue-id issue))
+                       ("issue-key" ,(jira-issue-key issue)))))
+    (concat ":PROPERTIES:\n"
+            (mapconcat (lambda (prop)
+                         (format ":%s: %s" (car prop) (cadr prop)))
+                       (seq-concatenate 'list issue-props extra-props)
+                       "\n")
+            "\n:END:")))
 
 (provide 'jirassic-org)
 ;;; jirassic-org.el ends here
