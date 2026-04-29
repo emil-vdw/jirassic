@@ -137,6 +137,24 @@
     (should (string= (adf-text-text (car (adf-paragraph-content (nth 1 content))))
                      "multiline quote"))))
 
+(ert-deftest jirassic-parser-test-parse-panel ()
+  (let* ((panel (jirassic--parse-panel
+                 '((type . "panel")
+                   (attrs (panelType . "warning")
+                          (localId . "088d70b6fe14"))
+                   (content
+                    . [((type . "paragraph")
+                        (content
+                         . [((type . "text")
+                             (text . "Heads up!"))]))]))))
+         (content (adf-panel-content panel)))
+    (should (cl-typep panel 'adf-panel))
+    (should (string= (adf-panel-panel-type panel) "warning"))
+    (should (= (length content) 1))
+    (should (cl-typep (nth 0 content) 'adf-paragraph))
+    (should (string= (adf-text-text (car (adf-paragraph-content (nth 0 content))))
+                     "Heads up!"))))
+
 (ert-deftest jirassic-parser-test-parse-doc ()
   (let* ((doc (jirassic--parse-doc
                '((type . "doc")

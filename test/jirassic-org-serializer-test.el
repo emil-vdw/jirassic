@@ -281,6 +281,33 @@
        (string= (jirassic-serializer--serialize-content-list content)
                 "* parent\n** child")))))
 
+;;; `adf-panel'
+(ert-deftest jirassic-serializer-test-panel ()
+  ;; Panel type drives the block name.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-panel
+                     :panel-type "warning"
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "Heads up!"))))))
+                   "#+BEGIN_WARNING\nHeads up!\n#+END_WARNING"))
+
+  ;; Multiple block children get the standard inter-block spacing.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-panel
+                     :panel-type "info"
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "First.")))
+                                    (make-adf-paragraph
+                                     :content (list (make-adf-text :text "Second."))))))
+                   "#+BEGIN_INFO\nFirst.\nSecond.\n#+END_INFO"))
+
+  ;; Missing panel type falls back to the generic block name.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-panel
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "x"))))))
+                   "#+BEGIN_PANEL\nx\n#+END_PANEL")))
+
 ;;; `adf-table'
 (ert-deftest jirassic-serializer-test-table-plain ()
   "Table with plain text cells serializes to a correctly padded org table."

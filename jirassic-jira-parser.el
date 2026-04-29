@@ -36,6 +36,7 @@
       ("listItem" (make-adf-list-item :content (jirassic--parse-content-list .content)))
       ("paragraph" (jirassic--parse-paragraph node))
       ("blockquote" (jirassic--parse-blockquote node))
+      ("panel" (jirassic--parse-panel node))
       ;; ((type . "inlineCard") (attrs (url . "https://acme.com")))
       ;; ((type . "inlineCard") (attrs (data (@context . "https://schema.org") ...)))
       ("inlineCard" (make-adf-inline-card :url .attrs.url :data .attrs.data))
@@ -171,6 +172,21 @@ See the definition of `adf-code-block' for the constraints of
   (declare (pure t) (side-effect-free t))
   (let-alist blockquote
     (make-adf-blockquote :content (jirassic--parse-content-list .content))))
+
+(defun jirassic--parse-panel (panel)
+  "Create an `adf-panel' object from a PANEL ADF node."
+  ;; Example ADF alist:
+  ;; ((type . "panel")
+  ;;  (attrs (panelType . "warning")
+  ;;         (localId . "088d70b6fe14"))
+  ;;  (content
+  ;;   . [((type . "paragraph")
+  ;;       (content . [((type . "text") (text . "Heads up!"))]))]))
+  (declare (pure t) (side-effect-free t))
+  (let-alist panel
+    (make-adf-panel
+     :content (jirassic--parse-content-list .content)
+     :panel-type .attrs.panelType)))
 
 (provide 'jirassic-jira-parser)
 ;;; jirassic-jira-parser.el ends here

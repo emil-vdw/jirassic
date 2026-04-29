@@ -292,6 +292,19 @@ Formats to a date without time components."
   (format "\n#+BEGIN_QUOTE\n%s\n#+END_QUOTE\n"
           (jirassic-serializer--serialize-content-list (adf-blockquote-content blockquote))))
 
+;;; `adf-panel'
+(cl-defmethod jirassic--serialize-to-org ((panel adf-panel) &optional _level)
+  "Serialise PANEL to an `org-mode' special block.
+
+The block name is the ADF panel type upper-cased (e.g. INFO, WARNING).
+When a panel has no panel type, fall back to the generic name PANEL."
+  (declare (pure t) (side-effect-free t))
+  (let ((block-name (upcase (or (adf-panel-panel-type panel) "panel"))))
+    (format "#+BEGIN_%s\n%s\n#+END_%s"
+            block-name
+            (jirassic-serializer--serialize-content-list (adf-panel-content panel))
+            block-name)))
+
 ;;; `adf-table'
 (cl-defmethod jirassic--serialize-to-org ((table adf-table) &optional _level)
   "Serialize TABLE into an `org-mode' table.

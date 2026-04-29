@@ -197,6 +197,23 @@ LANGUAGE may be provided as a string, e.g. \"python\"."
 - `adf-media-single'"
   content)
 
+(cl-defstruct adf-panel
+  "A coloured container that visually highlights its content.
+
+CONTENT must contain one or more of:
+  - `adf-bullet-list'
+  - `adf-heading' with no marks
+  - `adf-ordered-list'
+  - `adf-paragraph' with no marks
+
+PANEL-TYPE is the ADF panel style as a string and is one of:
+  - \"info\"
+  - \"note\"
+  - \"success\"
+  - \"warning\"
+  - \"error\""
+  content panel-type)
+
 (cl-defstruct adf-bullet-list content)
 (cl-defstruct adf-ordered-list content)
 
@@ -249,7 +266,7 @@ content must contain at least one of the following nodes:
                    adf-media-group
                    adf-media-single
                    adf-ordered-list
-                   ;; adf-panel
+                   adf-panel
                    adf-paragraph
                    adf-rule
                    adf-table
