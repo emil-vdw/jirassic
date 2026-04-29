@@ -16,7 +16,7 @@
 (require 'jirassic-org-serializer)
 
 
-(defcustom jirassic-jira-to-org-status-alist nil
+(defcustom jirassic-jira-to-org-keyword-alist nil
   "An alist mapping Jira status strings to Org TODO keyword strings."
   :type '(alist :key-type string :value-type string)
   :group 'jirassic)
@@ -80,7 +80,7 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
     (list :issue-id (jira-issue-id issue)
           :issue-status issue-status
           :issue-todo-keyword (alist-get issue-status
-                                         jirassic-jira-to-org-status-alist
+                                         jirassic-jira-to-org-keyword-alist
                                          issue-status)
           :issue-key issue-key
           :issue-summary issue-summary
