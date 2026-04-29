@@ -16,7 +16,10 @@
 ;; Provides an Org centered Jira client.
 
 ;;; Code:
-
+(defgroup jirassic nil
+  "Org centered Jira client."
+  :link '(url-link "https://github.com/emil-vdw/jirassic")
+  :group 'tool)
 
 (provide 'jirassic)
 ;;; jirassic.el ends here
