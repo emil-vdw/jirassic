@@ -59,6 +59,7 @@
    (make-jira-issue
     :id .id :key .key
     :description (jirassic-parse-adf-node .fields.description)
+    :status .fields.status.name
     :summary .fields.summary)))
 
 (defun jirassic--parse-doc (doc)

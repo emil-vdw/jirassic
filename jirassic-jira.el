@@ -28,7 +28,7 @@
   "Container for a Jira issue.
 
 DESCRIPTION is an `adf-doc' node."
-  id key summary description)
+  id key summary description status)
 
 ;;; Root node
 (cl-defstruct adf-doc content)

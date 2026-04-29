@@ -34,8 +34,8 @@
     promise))
 
 (defun jirassic--jira-api-url ()
-  "Returns the Jira Rest API URL for JIRASSIC-HOST."
-  (concat (string-remove-suffix "/" (jirassic--host)) "/rest/api/3"))
+  "Return the Jira Rest API URL for JIRASSIC-HOST."
+  (concat (string-remove-suffix "/" jirassic-host) "/rest/api/3"))
 
 (defun jirassic-client--credentials ()
   "API credentials for JIRASSIC-HOST."

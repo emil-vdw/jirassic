@@ -16,6 +16,12 @@
 (require 'jirassic-org-serializer)
 
 
+(defcustom jirassic-jira-to-org-status-alist nil
+  "An alist mapping Jira status strings to Org TODO keyword strings."
+  :type '(alist :key-type string :value-type string)
+  :group 'jirassic)
+
+
 (defun jirassic--build-issue-url-pattern ()
   "Build an issue URL pattern for `jirassic-host'."
   (rx-to-string
@@ -34,11 +40,7 @@
                         key-or-url))
                (issue (aio-wait-for (jirassic-get-issue key))))
           (org-capture-put :jira-issue issue)
-          (org-link-add-props
-           :issue-key (jira-issue-key issue)
-           :issue-id (jira-issue-id issue)
-           :issue-summary (jira-issue-summary issue)
-           :issue-description (jirassic--serialize-to-org (jira-issue-description issue))))
+          (apply #'org-link-add-props (jirassic-org--issue-properties issue)))
       (error
        (error "Failed to fetch issue Jira issue: %s"
               (error-message-string err))))))
@@ -52,7 +54,7 @@
   (let* ((issue (aio-await (jirassic-get-issue issue-key))))
     (insert (jirassic--serialize-to-org issue))))
 
-(defun jirassic-org--issue-properties (issue &optional extra-props)
+(defun jirassic-org--issue-property-drawer (issue &optional extra-props)
   "Return an org property drawer for Jira ISSUE.
 
 EXTRA-PROPS can be an alist of extra properties to include in the drawer."
@@ -64,6 +66,27 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
                        (seq-concatenate 'list issue-props extra-props)
                        "\n")
             "\n:END:")))
+
+(defun jirassic-org--issue-properties (issue)
+  "Return a plist of ISSUE props for template substitution."
+  (let* ((issue-summary (jira-issue-summary issue))
+         (issue-key (jira-issue-key issue))
+         (issue-summary-slug (replace-regexp-in-string
+                              "[^a-zA-Z0-9_]+" "_"
+                              (downcase issue-summary)))
+         (issue-property-drawer (jirassic-org--issue-property-drawer issue
+                                                                     `((ROAM_ALIASES ,issue-key))))
+         (issue-status (jira-issue-status issue)))
+    (list :issue-id (jira-issue-id issue)
+          :issue-status issue-status
+          :issue-todo-keyword (alist-get issue-status
+                                         jirassic-jira-to-org-status-alist
+                                         issue-status)
+          :issue-key issue-key
+          :issue-summary issue-summary
+          :issue-summary-slug issue-summary-slug
+          :issue-description (jirassic--serialize-to-org (jira-issue-description issue))
+          :issue-property-drawer issue-property-drawer)))
 
 (provide 'jirassic-org)
 ;;; jirassic-org.el ends here

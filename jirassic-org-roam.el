@@ -12,7 +12,7 @@
 (require 'jirassic-org)
 (require 'jirassic-org-serializer)
 
-(defcustom jirassic-org-roam-templates
+(defcustom jirassic-org-roam-capture-templates
   `(("i" "Issue" plain "%?"
      :target
      (file+head "${issue-key}-${issue-summary-slug}.org"
@@ -24,7 +24,7 @@
      :unnarrowed t))
   "Default org-roam Jira capture templates.")
 
-(defun jirassic-org-roam-capture (key-or-url)
+(cl-defun jirassic-org-roam-capture (key-or-url &key goto keys node info props templates)
   "Capture a Jira issue form KEY-OR-URL using an Org-roam template.
 
 ISSUE-KEY can be either a normal Jira issue key, eg. `XYZ-123',
@@ -43,24 +43,16 @@ Org-roam template. For a full list of available variables, see the
                     (when (string-match url-pattern key-or-url)
                       (match-string 1 key-or-url)))
                   key-or-url))
-         (issue (aio-wait-for (jirassic-get-issue key)))
-         (node (org-roam-node-create))
-         (issue-summary (jira-issue-summary issue))
-         (issue-summary-slug (replace-regexp-in-string
-                              "[^a-zA-Z0-9_]+" "_"
-                              (downcase issue-summary)))
-         (issue-property-drawer (jirassic-org--issue-properties issue
-                                                                `((ROAM_ALIASES ,key)))))
+         (issue (aio-wait-for (jirassic-get-issue key))))
     (org-roam-capture-
-     :node node
-     :info
-     (list :issue-id (jira-issue-id issue)
-           :issue-key key
-           :issue-summary issue-summary
-           :issue-summary-slug issue-summary-slug
-           :issue-description (jirassic--serialize-to-org (jira-issue-description issue))
-           :issue-property-drawer issue-property-drawer)
-     :templates jirassic-org-roam-templates)))
+     :goto goto
+     :keys keys
+     :node (or node (org-roam-node-create))
+     :info (seq-concatenate 'list
+                            (jirassic-org--issue-properties issue) info)
+     :props props
+     :templates (or templates
+                    jirassic-org-roam-capture-templates))))
 
 (provide 'jirassic-org-roam)
 ;;; jirassic-org-roam.el ends here
