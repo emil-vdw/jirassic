@@ -305,6 +305,17 @@ When a panel has no panel type, fall back to the generic name PANEL."
             (jirassic-serializer--serialize-content-list (adf-panel-content panel))
             block-name)))
 
+;;; `adf-expand'
+(cl-defmethod jirassic--serialize-to-org ((expand adf-expand) &optional _level)
+  "Serialise EXPAND to an `org-mode' special block."
+  (declare (pure t) (side-effect-free t))
+  (let ((title (adf-expand-title expand)))
+    (format "#+BEGIN_EXPAND%s\n%s\n#+END_EXPAND"
+            (if (and title (not (string-empty-p title)))
+                (concat " " title)
+              "")
+            (jirassic-serializer--serialize-content-list (adf-expand-content expand)))))
+
 ;;; `adf-table'
 (cl-defmethod jirassic--serialize-to-org ((table adf-table) &optional _level)
   "Serialize TABLE into an `org-mode' table.
@@ -321,9 +332,11 @@ return a placeholder."
     (let* (;; We get a two dimensional list of serialized cell
            ;; contents first so we can determine the column widths.
            (serialized-rows (jirassic--table-serialize-row-contents (adf-table-content table)))
+           (columns (apply #'cl-mapcar #'list (mapcar #'adf-table-row-content
+                                                      (adf-table-content table))))
            (serialized-columns (apply #'cl-mapcar #'list serialized-rows))
            (column-widths
-            (mapcar #'jirassic--column-min-width serialized-columns)))
+            (mapcar #'jirassic--column-min-width columns)))
       (concat
        ;; Header content
        (jirassic--format-table-row (nth 0 serialized-rows) column-widths)
@@ -375,8 +388,9 @@ return a placeholder."
 Only supports left aligned cells (`org-mode' limitation)."
   (declare (pure t) (side-effect-free t))
   (let ((padding (- width (length serialized-content))))
-    (concat serialized-content
-            (jirassic--string-repeat padding " "))))
+    (when (> padding 0)
+      (concat serialized-content
+              (jirassic--string-repeat padding " ")))))
 
 (defun jirassic--column-min-width (column)
   "Determine the min width needed for all values in COLUMN."
@@ -384,6 +398,23 @@ Only supports left aligned cells (`org-mode' limitation)."
   ;; the width of the column when there are hidden characters.
   (declare (pure t) (side-effect-free t))
   (+ 2 (apply #'max (mapcar #'length column))))
+
+(defun jirassic--column-min-width (column)
+  "Determine the min width needed for `adf-table-header' or `adf-table-cell' cells in COLUMN."
+  (declare (pure t) (side-effect-free t))
+  (+ 2 (apply #'max
+              (mapcar (lambda (cell)
+                        (let ((serialized-content
+                               (mapconcat #'jirassic--serialize-to-org
+                                          (jirassic--table-cell-content cell))))
+                          (- (length serialized-content)
+                             ;; When org hides emphasis markers,
+                             ;; adjust the length so it matches the
+                             ;; rendered lenght, not char length.
+                             (if org-hide-emphasis-markers
+                                 (jirassic-serializer--hidden-emphasis-char-count cell)
+                               0))))
+                      column))))
 
 (defun jirassic--s-join (strings separator)
   "Join all the strings in STRINGS with SEPARATOR in between."
@@ -508,6 +539,41 @@ Example:
 (defun jirassic-serializer--level-spaces (level)
   "Return the number of whitespaces of indentation for LEVEL."
   (* jirassic-level-indent level))
+
+(defun jirassic-serializer--hidden-emphasis-char-count (node)
+  "Return the count of chars `org-hide-emphasis-markers' would hide in NODE.
+
+Walks NODE and all descendants, summing the emphasis-marker characters
+that would be visually hidden when the serialized org output is
+displayed with `org-hide-emphasis-markers' enabled.
+
+Mirrors the first-mark-applies behavior of `jirassic--serialize-to-org'
+for `adf-text': only the first mark in `jirassic-serializer--supported-marks'
+applies, so each marked text contributes at most 2 hidden chars."
+  (cond
+   ((adf-text-p node)
+    (let ((mark (car (seq-filter
+                      (lambda (mark)
+                        (memq (adf-mark-type mark)
+                              jirassic-serializer--supported-marks))
+                      (adf-text-marks node)))))
+      (if (and mark
+               (memq (adf-mark-type mark)
+                     ;; Marks whose surrounding chars are hidden by
+                     ;; `org-hide-emphasis-markers'.
+                     '(code em strike strong underline)))
+          2
+        0)))
+   (t (apply #'+
+             (mapcar #'jirassic-serializer--hidden-emphasis-char-count
+                     (jirassic-serializer--node-content node))))))
+
+(defun jirassic-serializer--node-content (node)
+  "Return the value of NODE's `content' slot, or nil if it has none."
+  (when (cl-struct-p node)
+    (let ((type (type-of node)))
+      (when (assq 'content (cl-struct-slot-info type))
+        (cl-struct-slot-value type 'content node)))))
 
 (provide 'jirassic-org-serializer)
 ;;; jirassic-org-serializer.el ends here

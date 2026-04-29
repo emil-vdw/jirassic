@@ -214,6 +214,29 @@ PANEL-TYPE is the ADF panel style as a string and is one of:
   - \"error\""
   content panel-type)
 
+(cl-defstruct adf-expand
+  "A foldable container, similar to an accordion or disclosure widget.
+
+CONTENT must contain one or more of:
+  - `adf-blockquote'
+  - `adf-bullet-list'
+  - `adf-code-block'
+  - `adf-heading'
+  - `adf-media-group'
+  - `adf-media-single'
+  - `adf-ordered-list'
+  - `adf-panel'
+  - `adf-paragraph'
+  - `adf-rule'
+  - `adf-table'
+
+TITLE is an optional string label shown in place of the collapsed
+content.  May be nil.
+
+For expands inside table cells, ADF uses nestedExpand instead — see
+`adf-nested-expand'."
+  content title)
+
 (cl-defstruct adf-bullet-list content)
 (cl-defstruct adf-ordered-list content)
 
@@ -261,7 +284,7 @@ content must contain at least one of the following nodes:
                    adf-blockquote
                    adf-bullet-list
                    adf-code-block
-                   ;; adf-expand
+                   adf-expand
                    adf-heading
                    adf-media-group
                    adf-media-single

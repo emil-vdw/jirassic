@@ -281,6 +281,31 @@
        (string= (jirassic-serializer--serialize-content-list content)
                 "* parent\n** child")))))
 
+;;; `adf-expand'
+(ert-deftest jirassic-serializer-test-expand ()
+  ;; Title is emitted as a block argument so it stays attached to the block.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-expand
+                     :title "Hello world"
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "Hello world"))))))
+                   "#+BEGIN_EXPAND Hello world\nHello world\n#+END_EXPAND"))
+
+  ;; nil title — no block argument.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-expand
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "body"))))))
+                   "#+BEGIN_EXPAND\nbody\n#+END_EXPAND"))
+
+  ;; Empty-string title is treated the same as nil.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-expand
+                     :title ""
+                     :content (list (make-adf-paragraph
+                                     :content (list (make-adf-text :text "body"))))))
+                   "#+BEGIN_EXPAND\nbody\n#+END_EXPAND")))
+
 ;;; `adf-panel'
 (ert-deftest jirassic-serializer-test-panel ()
   ;; Panel type drives the block name.

@@ -37,6 +37,7 @@
       ("paragraph" (jirassic--parse-paragraph node))
       ("blockquote" (jirassic--parse-blockquote node))
       ("panel" (jirassic--parse-panel node))
+      ("expand" (jirassic--parse-expand node))
       ;; ((type . "inlineCard") (attrs (url . "https://acme.com")))
       ;; ((type . "inlineCard") (attrs (data (@context . "https://schema.org") ...)))
       ("inlineCard" (make-adf-inline-card :url .attrs.url :data .attrs.data))
@@ -187,6 +188,22 @@ See the definition of `adf-code-block' for the constraints of
     (make-adf-panel
      :content (jirassic--parse-content-list .content)
      :panel-type .attrs.panelType)))
+
+(defun jirassic--parse-expand (expand)
+  "Create an `adf-expand' object from an EXPAND ADF node."
+  ;; Example ADF alist:
+  ;; ((type . "expand")
+  ;;  (attrs (title . "Hello world"))
+  ;;  (content
+  ;;   . [((type . "paragraph")
+  ;;       (content . [((type . "text") (text . "Hello world"))]))]))
+  ;;
+  ;; `attrs.title' is optional and may be absent or nil.
+  (declare (pure t) (side-effect-free t))
+  (let-alist expand
+    (make-adf-expand
+     :content (jirassic--parse-content-list .content)
+     :title .attrs.title)))
 
 (provide 'jirassic-jira-parser)
 ;;; jirassic-jira-parser.el ends here

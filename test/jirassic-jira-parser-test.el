@@ -137,6 +137,30 @@
     (should (string= (adf-text-text (car (adf-paragraph-content (nth 1 content))))
                      "multiline quote"))))
 
+(ert-deftest jirassic-parser-test-parse-expand ()
+  (let* ((expand (jirassic--parse-expand
+                  '((type . "expand")
+                    (attrs (title . "Hello world"))
+                    (content
+                     . [((type . "paragraph")
+                         (content
+                          . [((type . "text")
+                              (text . "Hello world"))]))]))))
+         (content (adf-expand-content expand)))
+    (should (cl-typep expand 'adf-expand))
+    (should (string= (adf-expand-title expand) "Hello world"))
+    (should (= (length content) 1))
+    (should (cl-typep (nth 0 content) 'adf-paragraph)))
+
+  ;; Title is optional — absent attrs.title should produce a nil title.
+  (let ((expand (jirassic--parse-expand
+                 '((type . "expand")
+                   (attrs)
+                   (content
+                    . [((type . "paragraph")
+                        (content . [((type . "text") (text . "x"))]))])))))
+    (should (eq (adf-expand-title expand) nil))))
+
 (ert-deftest jirassic-parser-test-parse-panel ()
   (let* ((panel (jirassic--parse-panel
                  '((type . "panel")
