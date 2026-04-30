@@ -331,22 +331,37 @@ return a placeholder."
              (cl-call-next-method))
     (let* (;; We get a two dimensional list of serialized cell
            ;; contents first so we can determine the column widths.
-           (serialized-rows (jirassic--table-serialize-row-contents (adf-table-content table)))
+           (rows (adf-table-content table))
+           (serialized-rows (jirassic--serialize-table-content (adf-table-content table)))
            (columns (apply #'cl-mapcar #'list (mapcar #'adf-table-row-content
                                                       (adf-table-content table))))
-           (serialized-columns (apply #'cl-mapcar #'list serialized-rows))
+           (visible-widths
+            (cl-mapcar (lambda (row serialized-row)
+                         (cl-mapcar (lambda (node serialized-cel)
+                                      (- (length serialized-cel)
+                                         (if org-hide-emphasis-markers
+                                             (jirassic-serializer--hidden-emphasis-char-count node)
+                                           0)))
+                                    (adf-table-row-content row) serialized-row))
+                       rows serialized-rows))
            (column-widths
             (mapcar #'jirassic--column-min-width columns)))
       (concat
        ;; Header content
-       (jirassic--format-table-row (nth 0 serialized-rows) column-widths)
+       (jirassic--format-table-row (nth 0 serialized-rows)
+                                   (nth 0 visible-widths)
+                                   column-widths)
        ;; Header seperator
        "\n" (jirassic--table-header-seperator column-widths) "\n"
        ;; Table content
-       (mapconcat (lambda (row) (jirassic--format-table-row row column-widths))
-                  (cdr serialized-rows) "\n")))))
+       (string-join
+        (cl-mapcar (lambda (row visible-row)
+                     (jirassic--format-table-row row visible-row column-widths))
+                   (cdr serialized-rows)
+                   (cdr visible-widths))
+        "\n")))))
 
-(defun jirassic--table-serialize-row-contents (rows)
+(defun jirassic--serialize-table-content (rows)
   "Serialize each cell of each row in ROWS to an org string."
   (mapcar
    (lambda (row)
@@ -372,49 +387,35 @@ return a placeholder."
               "+")
    "|"))
 
-(defun jirassic--format-table-row (row-content column-widths)
-  "Format serialized ROW-CONTENT int a row with COLUMN-WIDTHS."
+(defun jirassic--format-table-row (row-content visible-widths column-widths)
+  "Format serialized ROW-CONTENT with VISIBLE-WIDTHS into a row with COLUMN-WIDTHS."
   (let ((padded-row-content
-         (cl-mapcar (lambda (serialized-cell width)
-                      (jirassic--pad-table-cell serialized-cell width))
-                    row-content column-widths)))
+         (cl-mapcar (lambda (ser-cell vis-width col-width)
+                      (concat ser-cell
+                              (jirassic--string-repeat
+                               (- col-width vis-width)
+                               " ")))
+                    row-content visible-widths column-widths)))
    (concat "| "
            (jirassic--s-join padded-row-content " | ")
            " |")))
 
-(defun jirassic--pad-table-cell (serialized-content width)
-  "Pad SERIALIZED-CONTENT with whitespace so it is WIDTH chars wide.
-
-Only supports left aligned cells (`org-mode' limitation)."
-  (declare (pure t) (side-effect-free t))
-  (let ((padding (- width (length serialized-content))))
-    (when (> padding 0)
-      (concat serialized-content
-              (jirassic--string-repeat padding " ")))))
-
-(defun jirassic--column-min-width (column)
-  "Determine the min width needed for all values in COLUMN."
-  ;; TODO: take into account `org-hide-emphasis-markers'. This changes
-  ;; the width of the column when there are hidden characters.
-  (declare (pure t) (side-effect-free t))
-  (+ 2 (apply #'max (mapcar #'length column))))
-
 (defun jirassic--column-min-width (column)
   "Determine the min width needed for `adf-table-header' or `adf-table-cell' cells in COLUMN."
   (declare (pure t) (side-effect-free t))
-  (+ 2 (apply #'max
-              (mapcar (lambda (cell)
-                        (let ((serialized-content
-                               (mapconcat #'jirassic--serialize-to-org
-                                          (jirassic--table-cell-content cell))))
-                          (- (length serialized-content)
-                             ;; When org hides emphasis markers,
-                             ;; adjust the length so it matches the
-                             ;; rendered lenght, not char length.
-                             (if org-hide-emphasis-markers
-                                 (jirassic-serializer--hidden-emphasis-char-count cell)
-                               0))))
-                      column))))
+  (apply #'max
+         (mapcar (lambda (cell)
+                   (let ((serialized-content
+                          (mapconcat #'jirassic--serialize-to-org
+                                     (jirassic--table-cell-content cell))))
+                     (- (length serialized-content)
+                        ;; When org hides emphasis markers,
+                        ;; adjust the length so it matches the
+                        ;; rendered length, not char length.
+                        (if org-hide-emphasis-markers
+                            (jirassic-serializer--hidden-emphasis-char-count cell)
+                          0))))
+                 column)))
 
 (defun jirassic--s-join (strings separator)
   "Join all the strings in STRINGS with SEPARATOR in between."
@@ -539,6 +540,11 @@ Example:
 (defun jirassic-serializer--level-spaces (level)
   "Return the number of whitespaces of indentation for LEVEL."
   (* jirassic-level-indent level))
+
+(defun jirassc--visible-length (node)
+  ""
+  (- (length (jirassic--serialize-to-org node))
+     (jirassic-serializer--hidden-emphasis-char-count node)))
 
 (defun jirassic-serializer--hidden-emphasis-char-count (node)
   "Return the count of chars `org-hide-emphasis-markers' would hide in NODE.
