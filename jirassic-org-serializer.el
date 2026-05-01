@@ -340,7 +340,7 @@ return a placeholder."
                          (cl-mapcar (lambda (node serialized-cel)
                                       (- (length serialized-cel)
                                          (if org-hide-emphasis-markers
-                                             (jirassic-serializer--hidden-emphasis-char-count node)
+                                             (jirassic-serializer--hidden-emphasis-chars node)
                                            0)))
                                     (adf-table-row-content row) serialized-row))
                        rows serialized-rows))
@@ -413,7 +413,7 @@ return a placeholder."
                         ;; adjust the length so it matches the
                         ;; rendered length, not char length.
                         (if org-hide-emphasis-markers
-                            (jirassic-serializer--hidden-emphasis-char-count cell)
+                            (jirassic-serializer--hidden-emphasis-chars cell)
                           0))))
                  column)))
 
@@ -541,12 +541,7 @@ Example:
   "Return the number of whitespaces of indentation for LEVEL."
   (* jirassic-level-indent level))
 
-(defun jirassc--visible-length (node)
-  ""
-  (- (length (jirassic--serialize-to-org node))
-     (jirassic-serializer--hidden-emphasis-char-count node)))
-
-(defun jirassic-serializer--hidden-emphasis-char-count (node)
+(defun jirassic-serializer--hidden-emphasis-chars (node)
   "Return the count of chars `org-hide-emphasis-markers' would hide in NODE.
 
 Walks NODE and all descendants, summing the emphasis-marker characters
@@ -571,7 +566,7 @@ applies, so each marked text contributes at most 2 hidden chars."
           2
         0)))
    (t (apply #'+
-             (mapcar #'jirassic-serializer--hidden-emphasis-char-count
+             (mapcar #'jirassic-serializer--hidden-emphasis-chars
                      (jirassic-serializer--node-content node))))))
 
 (defun jirassic-serializer--node-content (node)
