@@ -62,7 +62,8 @@
     :id .id :key .key
     :description (jirassic-parse-adf-node .fields.description)
     :status .fields.status.name
-    :summary .fields.summary)))
+    :summary .fields.summary
+    :type .fields.issuetype.name)))
 
 (defun jirassic--parse-doc (doc)
   "Parse an ADF DOC node."

@@ -350,6 +350,8 @@
                   (key . "PROJ-1")
                   (fields
                    (summary . "Fix the bug")
+                   (status (name . "In Progress"))
+                   (issuetype (name . "Bug"))
                    (description
                     (type . "doc")
                     (content
@@ -360,6 +362,8 @@
     (should (string= (jira-issue-id issue) "10001"))
     (should (string= (jira-issue-key issue) "PROJ-1"))
     (should (string= (jira-issue-summary issue) "Fix the bug"))
+    (should (string= (jira-issue-status issue) "In Progress"))
+    (should (string= (jira-issue-type issue) "Bug"))
     (should (cl-typep (jira-issue-description issue) 'adf-doc))))
 
 (provide 'jirassic-jira-parser-test)
