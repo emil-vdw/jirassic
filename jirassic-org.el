@@ -21,7 +21,6 @@
   :type '(alist :key-type string :value-type string)
   :group 'jirassic)
 
-
 (defun jirassic--build-issue-url-pattern ()
   "Build an issue URL pattern for `jirassic-host'."
   (rx-to-string
@@ -45,8 +44,18 @@
        (error "Failed to fetch issue Jira issue: %s"
               (error-message-string err))))))
 
-(advice-add 'org-capture-set-target-location :before
-            #'jirassic-capture--maybe-fetch-issue)
+(defun jirassic-org-capture (key-or-url &optional goto keys)
+  "Org capture from a Jira issue from KEY-OR-URL."
+  (interactive "sIssue Key: ")
+  (let* ((url-pattern (jirassic--build-issue-url-pattern))
+         (key (or (save-match-data
+                    (when (string-match url-pattern key-or-url)
+                      (match-string 1 key-or-url)))
+                  key-or-url))
+         (issue (aio-wait-for (jirassic-get-issue key))))
+    (apply #'org-link-add-props (jirassic-org--issue-properties issue))
+    (let ((org-capture-link-is-already-stored t))
+      (org-capture goto keys))))
 
 (aio-defun jirassic-insert-issue (key &optional level)
   "Fetch Jira issue with KEY and insert at point as an org heading at LEVEL."

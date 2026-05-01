@@ -38,21 +38,22 @@ Fetches the Jira issue and supplies a lot of extra information to the
 Org-roam template. For a full list of available variables, see the
 `jirassic-org-roam-capture-templates' variable."
   (interactive "sIssue key: ")
-  (let* ((url-pattern (jirassic--build-issue-url-pattern))
-         (key (or (save-match-data
-                    (when (string-match url-pattern key-or-url)
-                      (match-string 1 key-or-url)))
-                  key-or-url))
-         (issue (aio-wait-for (jirassic-get-issue key))))
-    (org-roam-capture-
-     :goto goto
-     :keys keys
-     :node (or node (org-roam-node-create))
-     :info (seq-concatenate 'list
-                            (jirassic-org--issue-properties issue) info)
-     :props props
-     :templates (or templates
-                    jirassic-org-roam-capture-templates))))
+  (aio-with-async
+    (let* ((url-pattern (jirassic--build-issue-url-pattern))
+           (key (or (save-match-data
+                      (when (string-match url-pattern key-or-url)
+                        (match-string 1 key-or-url)))
+                    key-or-url))
+           (issue (aio-await (jirassic-get-issue key))))
+      (org-roam-capture-
+       :goto goto
+       :keys keys
+       :node (or node (org-roam-node-create))
+       :info (seq-concatenate 'list
+                              (jirassic-org--issue-properties issue) info)
+       :props props
+       :templates (or templates
+                      jirassic-org-roam-capture-templates)))))
 
 (provide 'jirassic-org-roam)
 ;;; jirassic-org-roam.el ends here
