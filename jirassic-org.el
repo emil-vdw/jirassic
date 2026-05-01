@@ -85,13 +85,16 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
                               (downcase issue-summary)))
          (issue-property-drawer (jirassic-org--issue-property-drawer issue
                                                                      `((ROAM_ALIASES ,issue-key))))
-         (issue-status (jira-issue-status issue)))
+         (issue-status (jira-issue-status issue))
+         (creator (jira-issue-creator issue)))
     (list :issue-id (jira-issue-id issue)
           :issue-status issue-status
           :issue-todo-keyword (alist-get issue-status
                                          jirassic-jira-to-org-keyword-alist
                                          issue-status)
           :issue-type (jira-issue-type issue)
+          :issue-creator-display-name (when creator (jira-user-display-name creator))
+          :issue-creator-email (when creator (jira-user-email creator))
           :issue-key issue-key
           :issue-summary issue-summary
           :issue-summary-slug issue-summary-slug

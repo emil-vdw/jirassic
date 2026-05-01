@@ -24,11 +24,18 @@
 ;;; Code:
 (require 'cl-lib)
 
+(cl-defstruct jira-user
+  "A Jira user account.
+
+Represents any user-valued field: creator, assignee, reporter, etc."
+  account-id display-name email)
+
 (cl-defstruct jira-issue
   "Container for a Jira issue.
 
-DESCRIPTION is an `adf-doc' node."
-  id key summary description status type)
+DESCRIPTION is an `adf-doc' node.
+CREATOR is a `jira-user' struct."
+  id key summary description status type creator)
 
 ;;; Root node
 (cl-defstruct adf-doc content)
