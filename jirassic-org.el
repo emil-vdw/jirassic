@@ -94,7 +94,9 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
           :issue-key issue-key
           :issue-summary issue-summary
           :issue-summary-slug issue-summary-slug
-          :issue-description (jirassic--serialize-to-org (jira-issue-description issue))
+          :issue-description (jirassic--serialize-to-org
+                              (jirassic-adjust-heading-level
+                               (jira-issue-description issue) 1))
           :issue-property-drawer issue-property-drawer)))
 
 (provide 'jirassic-org)
