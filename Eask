@@ -17,9 +17,11 @@
 (files
  "jirassic.el"
  "jirassic-client.el"
- "jirassic-adf.el"
- "jirassic-adf-parser.el"
- "jirassic-serializer.el")
+ "jirassic-jira.el"
+ "jirassic-jira-parser.el"
+ "jirassic-org-serializer.el"
+ "jirassic-org.el"
+ "jirassic-org-roam.el")
 
 (depends-on "emacs" "26.1")
 (depends-on "aio" "1.0")
