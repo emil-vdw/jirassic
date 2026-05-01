@@ -356,9 +356,9 @@
                         :content (list (make-adf-paragraph
                                         :content (list (make-adf-text :text "bar")))))))))))
     (should (string= (jirassic--serialize-to-org table)
-                     (concat "| Name   | Value   |\n"
-                             "|--------+---------|\n"
-                             "| foo    | bar     |")))))
+                     (concat "| Name | Value |\n"
+                             "|------+-------|\n"
+                             "| foo  | bar   |")))))
 
 (ert-deftest jirassic-serializer-test-table-emphasis-column-width ()
   "Table column widths account for `org-hide-emphasis-markers'.
@@ -390,16 +390,16 @@ extra padding to compensate for the hidden marker characters."
     ;; Markers visible: *bar* is 5 chars, so col2 width = max(4,5)+2 = 7.
     (let ((org-hide-emphasis-markers nil))
       (should (string= (jirassic--serialize-to-org table)
-                       (concat "| Name   | Bold    |\n"
-                               "|--------+---------|\n"
-                               "| foo    | *bar*   |"))))
+                       (concat "| Name | Bold  |\n"
+                               "|------+-------|\n"
+                               "| foo  | *bar* |"))))
     ;; Markers hidden: *bar* is 3 chars, so col2 width = max(4,3)+2 = 6.
     ;; The *bar* cell gets 3 spaces of padding (to fill 6 visible chars) rather than 2.
     (let ((org-hide-emphasis-markers t))
       (should (string= (jirassic--serialize-to-org table)
-                       (concat "| Name   | Bold   |\n"
-                               "|--------+--------|\n"
-                               "| foo    | *bar*    |"))))))
+                       (concat "| Name | Bold |\n"
+                               "|------+------|\n"
+                               "| foo  | *bar*  |"))))))
 
 ;;; fallback serializer
 (cl-defstruct jirassic-test--unsupported-node)
