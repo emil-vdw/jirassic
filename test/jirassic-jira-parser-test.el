@@ -344,16 +344,6 @@
     (should (eq (adf-inline-card-url card) nil))
     (should (equal (adf-inline-card-data card) data))))
 
-(ert-deftest jirassic-parser-test-parse-user ()
-  (let ((user (jirassic--parse-user
-               '((accountId . "abc123")
-                 (displayName . "Jane Doe")
-                 (emailAddress . "jane@example.com")))))
-    (should (cl-typep user 'jira-user))
-    (should (string= (jira-user-account-id user) "abc123"))
-    (should (string= (jira-user-display-name user) "Jane Doe"))
-    (should (string= (jira-user-email user) "jane@example.com"))))
-
 (ert-deftest jirassic-parser-test-parse-issue ()
   (let ((issue (jirassic--parse-issue
                 '((id . "10001")
@@ -365,6 +355,9 @@
                    (creator (accountId . "abc123")
                              (displayName . "Jane Doe")
                              (emailAddress . "jane@example.com"))
+                   (project (id . "10000")
+                             (key . "PROJ")
+                             (name . "My Project"))
                    (description
                     (type . "doc")
                     (content
@@ -381,7 +374,12 @@
     (let ((creator (jira-issue-creator issue)))
       (should (cl-typep creator 'jira-user))
       (should (string= (jira-user-display-name creator) "Jane Doe"))
-      (should (string= (jira-user-email creator) "jane@example.com")))))
+      (should (string= (jira-user-email creator) "jane@example.com")))
+    (let ((project (jira-issue-project issue)))
+      (should (cl-typep project 'jira-project))
+      (should (string= (jira-project-id project) "10000"))
+      (should (string= (jira-project-key project) "PROJ"))
+      (should (string= (jira-project-name project) "My Project")))))
 
 (provide 'jirassic-jira-parser-test)
 ;;; jirassic-jira-parser-test.el ends here

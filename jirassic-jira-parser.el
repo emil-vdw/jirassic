@@ -55,14 +55,6 @@
          ;; Return `nil' so this unsupported node can be filtered out.
          nil))))
 
-(defun jirassic--parse-user (user)
-  "Parse a Jira USER account alist into a `jira-user' struct."
-  (let-alist user
-    (make-jira-user
-     :account-id .accountId
-     :display-name .displayName
-     :email .emailAddress)))
-
 (defun jirassic--parse-issue (issue)
   "Parse a Jira ISSUE object."
   (let-alist issue
@@ -73,7 +65,15 @@
     :summary .fields.summary
     :type .fields.issuetype.name
     :creator (when .fields.creator
-               (jirassic--parse-user .fields.creator)))))
+               (make-jira-user
+                :account-id .fields.creator.accountId
+                :display-name .fields.creator.displayName
+                :email .fields.creator.emailAddress))
+    :project (when .fields.project
+               (make-jira-project
+                :id .fields.project.id
+                :key .fields.project.key
+                :name .fields.project.name)))))
 
 (defun jirassic--parse-doc (doc)
   "Parse an ADF DOC node."

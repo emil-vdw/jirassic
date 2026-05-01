@@ -30,12 +30,17 @@
 Represents any user-valued field: creator, assignee, reporter, etc."
   account-id display-name email)
 
+(cl-defstruct jira-project
+  "A Jira project."
+  id key name)
+
 (cl-defstruct jira-issue
   "Container for a Jira issue.
 
 DESCRIPTION is an `adf-doc' node.
-CREATOR is a `jira-user' struct."
-  id key summary description status type creator)
+CREATOR is a `jira-user' struct.
+PROJECT is a `jira-project' struct."
+  id key summary description status type creator project)
 
 ;;; Root node
 (cl-defstruct adf-doc content)
