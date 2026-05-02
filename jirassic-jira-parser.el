@@ -64,6 +64,7 @@
     :status .fields.status.name
     :summary .fields.summary
     :type .fields.issuetype.name
+    :priority .fields.priority.name
     :creator (when .fields.creator
                (make-jira-user
                 :account-id .fields.creator.accountId

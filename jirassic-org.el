@@ -94,6 +94,7 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
                                          jirassic-jira-to-org-keyword-alist
                                          issue-status)
           :issue-type (jira-issue-type issue)
+          :issue-priority (jira-issue-priority issue)
           :issue-creator-display-name (when creator (jira-user-display-name creator))
           :issue-creator-email (when creator (jira-user-email creator))
           :issue-project-id (when project (jira-project-id project))
