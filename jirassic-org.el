@@ -45,7 +45,9 @@
               (error-message-string err))))))
 
 (defun jirassic-org-capture (key-or-url &optional goto keys)
-  "Org capture from a Jira issue from KEY-OR-URL."
+  "Org capture from a Jira issue from KEY-OR-URL.
+
+GOTO and KEYS are passed to `org-capture' directly."
   (interactive "sIssue Key: ")
   (let* ((url-pattern (jirassic--build-issue-url-pattern))
          (key (or (save-match-data
