@@ -21,5 +21,7 @@
   :link '(url-link "https://github.com/emil-vdw/jirassic")
   :group 'tool)
 
+(define-error 'jirassic-error "Jirassic error")
+
 (provide 'jirassic)
 ;;; jirassic.el ends here
