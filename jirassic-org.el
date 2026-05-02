@@ -21,28 +21,18 @@
   :type '(alist :key-type string :value-type string)
   :group 'jirassic)
 
+(defvar jirassic-current-issue nil
+  "The `jira-issue' currently being captured.
+
+Bound dynamically during `jirassic-org-capture' so capture template
+sexps can access the full issue struct via this variable.")
+
 (defun jirassic--build-issue-url-pattern ()
   "Build an issue URL pattern for `jirassic-host'."
   (rx-to-string
    `(seq ,(concat (string-remove-suffix "/" jirassic-host)
                   "/browse/")
          (group (+ (any upper)) "-" (+ digit)))))
-
-(defun jirassic-capture--maybe-fetch-issue (&rest _)
-  "Fetch and stash Jira issue data when capturing a Jira template."
-  (when (org-capture-get :jirassic)
-    (condition-case err
-        (let* ((url-pattern (jirassic--build-issue-url-pattern))
-               (key-or-url (read-string "Jira issue key: "))
-               (key (or (save-match-data (when (string-match url-pattern key-or-url)
-                                           (match-string 1 key-or-url)))
-                        key-or-url))
-               (issue (aio-wait-for (jirassic-get-issue key))))
-          (org-capture-put :jira-issue issue)
-          (apply #'org-link-add-props (jirassic-org--issue-properties issue)))
-      (error
-       (error "Failed to fetch issue Jira issue: %s"
-              (error-message-string err))))))
 
 (defun jirassic-org-capture (key-or-url &optional goto keys)
   "Org capture from a Jira issue from KEY-OR-URL.
@@ -55,8 +45,13 @@ GOTO and KEYS are passed to `org-capture' directly."
                       (match-string 1 key-or-url)))
                   key-or-url))
          (issue (aio-wait-for (jirassic-get-issue key))))
-    (apply #'org-link-add-props (jirassic-org--issue-properties issue))
-    (let ((org-capture-link-is-already-stored t))
+    (apply #'org-link-store-props (jirassic-org--issue-properties issue))
+    (let (;; Set `jirassic-current-issue' so that this can be used by
+          ;; sexps in the template.
+          (jirassic-current-issue issue)
+          ;; Prevent `org-capture' from invoking `org-store-link' and
+          ;; overwriting the link props we just stored.
+          (org-capture-link-is-already-stored t))
       (org-capture goto keys))))
 
 (aio-defun jirassic-insert-issue (key &optional level)
@@ -100,7 +95,12 @@ EXTRA-DRAWER-PROPS is an alist of extra props to include in the formatted org dr
          (issue-status (jira-issue-status issue))
          (creator (jira-issue-creator issue))
          (project (jira-issue-project issue)))
-    (list :issue-id (jira-issue-id issue)
+    (list :type "jira"
+          :link (jira-issue-url issue)
+          :description (jira-issue-summary issue)
+          :annotation (org-link-make-string (jira-issue-url issue)
+                                       (jira-issue-key issue))
+          :issue-id (jira-issue-id issue)
           :issue-status issue-status
           :issue-todo-keyword (alist-get issue-status
                                          jirassic-jira-to-org-keyword-alist
