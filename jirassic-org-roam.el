@@ -50,7 +50,9 @@ Org-roam template. For a full list of available variables, see the
        :keys keys
        :node (or node (org-roam-node-create))
        :info (seq-concatenate 'list
-                              (jirassic-org--issue-properties issue) info)
+                              (jirassic-org--issue-properties issue
+                                                              `((ROAM_ALIASES ,key)))
+                              info)
        :props props
        :templates (or templates
                       jirassic-org-roam-capture-templates)))))

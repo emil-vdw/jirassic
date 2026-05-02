@@ -346,7 +346,8 @@
 
 (ert-deftest jirassic-parser-test-parse-issue ()
   (let ((issue (jirassic--parse-issue
-                '((id . "10001")
+                '((self . "https://acme.atlassian.net/rest/api/3/issue/10001")
+                  (id . "10001")
                   (key . "PROJ-1")
                   (fields
                    (summary . "Fix the bug")
@@ -368,6 +369,7 @@
     (should (cl-typep issue 'jira-issue))
     (should (string= (jira-issue-id issue) "10001"))
     (should (string= (jira-issue-key issue) "PROJ-1"))
+    (should (string= (jira-issue-url issue) "https://acme.atlassian.net/browse/PROJ-1"))
     (should (string= (jira-issue-summary issue) "Fix the bug"))
     (should (string= (jira-issue-status issue) "In Progress"))
     (should (string= (jira-issue-type issue) "Bug"))

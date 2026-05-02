@@ -67,24 +67,34 @@
   "Return an org property drawer for Jira ISSUE.
 
 EXTRA-PROPS can be an alist of extra properties to include in the drawer."
-  (let ((issue-props `(("issue-id" ,(jira-issue-id issue))
-                       ("issue-key" ,(jira-issue-key issue)))))
+  (let* ((issue-props `(("issue-key" ,(jira-issue-key issue))
+                        ("issue-id" ,(jira-issue-id issue))
+                        ("issue-url" ,(jira-issue-url issue))
+                        ("issue-type" ,(jira-issue-type issue))
+                        ("issue-priority" ,(jira-issue-priority issue))
+                        ("issue-project-key" ,(jira-project-key (jira-issue-project issue)))
+                        ("issue-project-name" ,(jira-project-name (jira-issue-project issue)))))
+         (creator-props (when-let (creator (jira-issue-creator issue))
+                          `(("issue-creator-email" ,(jira-user-email creator))
+                            ("issue-creator-display-name" ,(jira-user-display-name creator))))))
     (concat ":PROPERTIES:\n"
             (mapconcat (lambda (prop)
                          (format ":%s: %s" (car prop) (cadr prop)))
-                       (seq-concatenate 'list issue-props extra-props)
+                       (seq-concatenate 'list issue-props creator-props extra-props)
                        "\n")
             "\n:END:")))
 
-(defun jirassic-org--issue-properties (issue)
-  "Return a plist of ISSUE props for template substitution."
+(defun jirassic-org--issue-properties (issue &optional extra-drawer-props)
+  "Return a plist of ISSUE props for template substitution.
+
+EXTRA-DRAWER-PROPS is an alist of extra props to include in the formatted org drawer."
   (let* ((issue-summary (jira-issue-summary issue))
          (issue-key (jira-issue-key issue))
          (issue-summary-slug (replace-regexp-in-string
                               "[^a-zA-Z0-9_]+" "_"
                               (downcase issue-summary)))
          (issue-property-drawer (jirassic-org--issue-property-drawer issue
-                                                                     `((ROAM_ALIASES ,issue-key))))
+                                                                     extra-drawer-props))
          (issue-status (jira-issue-status issue))
          (creator (jira-issue-creator issue))
          (project (jira-issue-project issue)))
@@ -100,6 +110,7 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
           :issue-project-id (when project (jira-project-id project))
           :issue-project-key (when project (jira-project-key project))
           :issue-project-name (when project (jira-project-name project))
+          :issue-url (jira-issue-url issue)
           :issue-key issue-key
           :issue-summary issue-summary
           :issue-summary-slug issue-summary-slug

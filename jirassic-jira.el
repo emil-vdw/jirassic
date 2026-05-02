@@ -40,7 +40,7 @@ Represents any user-valued field: creator, assignee, reporter, etc."
 DESCRIPTION is an `adf-doc' node.
 CREATOR is a `jira-user' struct.
 PROJECT is a `jira-project' struct."
-  id key summary description status type priority creator project)
+  id key url summary description status type priority creator project)
 
 ;;; Root node
 (cl-defstruct adf-doc content)

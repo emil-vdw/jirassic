@@ -60,6 +60,9 @@
   (let-alist issue
    (make-jira-issue
     :id .id :key .key
+    :url (when .self
+           (concat (replace-regexp-in-string "/rest/api/.*$" "" .self)
+                   "/browse/" .key))
     :description (jirassic-parse-adf-node .fields.description)
     :status .fields.status.name
     :summary .fields.summary
