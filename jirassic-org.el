@@ -57,7 +57,7 @@ GOTO and KEYS are passed to `org-capture' directly."
 (aio-defun jirassic-insert-issue (key &optional level)
   "Fetch Jira issue with KEY and insert at point as an org heading at LEVEL."
   (interactive "sIssue key: ")
-  (let* ((issue (aio-await (jirassic-get-issue issue-key))))
+  (let* ((issue (aio-await (jirassic-get-issue key))))
     (insert (jirassic--serialize-to-org issue))))
 
 (defun jirassic-org--issue-property-drawer (issue &optional extra-props)
