@@ -183,6 +183,21 @@ parent container will consider indentation."
   (declare (pure t) (side-effect-free t))
   (adf-emoji-text emoji))
 
+;;; `adf-mention'
+(cl-defmethod jirassic--serialize-to-org ((mention adf-mention) &optional _level)
+  "Serialize a user MENTION to an org string, LEVEL is ignored."
+  (declare (pure t) (side-effect-free t))
+  (let* ((id (adf-mention-id mention))
+         (text (or (adf-mention-text mention)
+                   (concat "@" id))))
+    (format "[[mention:%s][%s]]" id text)))
+
+;;; `adf-status'
+(cl-defmethod jirassic--serialize-to-org ((status adf-status) &optional _level)
+  "Serialize a STATUS badge to an org string, LEVEL is ignored."
+  (declare (pure t) (side-effect-free t))
+  (format "=%s=" (or (adf-status-text status) "")))
+
 ;;; `adf-inline-card'
 (cl-defmethod jirassic--serialize-to-org ((card adf-inline-card) &optional _level)
   "Serialize CARD to an org link, LEVEL is ignored.

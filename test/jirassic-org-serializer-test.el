@@ -124,6 +124,30 @@
   (should (string= (jirassic--serialize-to-org (make-adf-emoji :text ":smile:"))
                    ":smile:")))
 
+;;; `adf-mention'
+(ert-deftest jirassic-serializer-test-mention ()
+  ;; TEXT is used as the link description when present.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-mention :id "abc123" :text "@John Doe"))
+                   "[[mention:abc123][@John Doe]]"))
+
+  ;; Falls back to @id as the description when TEXT is nil.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-mention :id "abc123"))
+                   "[[mention:abc123][@abc123]]")))
+
+;;; `adf-status'
+(ert-deftest jirassic-serializer-test-status ()
+  ;; Status text is wrapped in brackets.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-status :text "In Progress" :color "blue"))
+                   "=In Progress="))
+
+  ;; nil text produces empty verbatim markers.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-status))
+                   "==")))
+
 ;;; `adf-inline-card'
 (ert-deftest jirassic-serializer-test-inline-card ()
   ;; URL variant — no display text
