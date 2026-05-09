@@ -28,7 +28,9 @@
 (depends-on "plz" "	0.9.1")
 (depends-on "org" "9.5")
 (depends-on "seq" "2.24")
-(depends-on "org-roam")
+
+(development
+  (depends-on "org-roam"))
 
 ;;; Configure linters
 (setq sentence-end-double-space nil)
