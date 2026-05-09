@@ -71,7 +71,6 @@ characters are displayed verbatim rather than as formatting.")
 ;;; `jira-issue'
 (cl-defmethod jirassic--serialize-to-org ((issue jira-issue) &optional _level)
   "Serialise Jira ISSUE to an org mode task."
-  (declare (pure t) (side-effect-free t))
   (format "* %s\n%s"
           (jira-issue-summary issue)
           (jirassic--serialize-to-org
@@ -85,7 +84,6 @@ characters are displayed verbatim rather than as formatting.")
 ;;; `adf-doc'
 (cl-defmethod jirassic--serialize-to-org ((doc adf-doc) &optional _level)
   "Serialize DOC."
-  (declare (pure t) (side-effect-free t))
   (jirassic-serializer--serialize-content-list (adf-doc-content doc)))
 
 ;;; `adf-heading'
@@ -124,7 +122,6 @@ serialization."
 ;;; `adf-paragraph'
 (cl-defmethod jirassic--serialize-to-org ((paragraph adf-paragraph) &optional _level)
   "Serialize PARAGRAPH."
-  (declare (pure t) (side-effect-free t))
   (jirassic-serializer--serialize-content-list (adf-paragraph-content paragraph)))
 
 ;;; `adf-text'
@@ -172,7 +169,6 @@ Only applies the first supported mark because of org syntax limitations."
 ;;; `adf-rule'
 (cl-defmethod jirassic--serialize-to-org ((_rule adf-rule) &optional _level)
   "Serialize a rule to an org horizontal rule string, LEVEL is ignored."
-  (declare (pure t) (side-effect-free t))
   "-----")
 
 ;;; `adf-emoji'
@@ -181,13 +177,11 @@ Only applies the first supported mark because of org syntax limitations."
 
 LEVEL is ignored because `adf-emoji' is an inline node, so only its
 parent container will consider indentation."
-  (declare (pure t) (side-effect-free t))
   (adf-emoji-text emoji))
 
 ;;; `adf-mention'
 (cl-defmethod jirassic--serialize-to-org ((mention adf-mention) &optional _level)
   "Serialize a user MENTION to an org string, LEVEL is ignored."
-  (declare (pure t) (side-effect-free t))
   (let* ((id (adf-mention-id mention))
          (text (or (adf-mention-text mention)
                    (concat "@" id))))
@@ -196,7 +190,6 @@ parent container will consider indentation."
 ;;; `adf-status'
 (cl-defmethod jirassic--serialize-to-org ((status adf-status) &optional _level)
   "Serialize a STATUS badge to an org string, LEVEL is ignored."
-  (declare (pure t) (side-effect-free t))
   (format "=%s=" (or (adf-status-text status) "")))
 
 ;;; `adf-inline-card'
@@ -206,7 +199,6 @@ parent container will consider indentation."
 LEVEL is ignored because `adf-inline-card' is an inline node, so only
 its parent container will consider indentation."
   ;; The card will only ever contain a URL or DATA but never both.
-  (declare (pure t) (side-effect-free t))
   (if-let ((url (adf-inline-card-url card)))
       ;; Simple link if we only have the URL
       (format "[[%s]]" url)
@@ -226,7 +218,6 @@ its parent container will consider indentation."
   ;; we don't have to worry about how to know what type of list the
   ;; parent is, which we need to know to determine the type of marker
   ;; (e.g. "1." vs "-").
-  (declare (pure t) (side-effect-free t))
   (let ((bullet-char (if (functionp jirassic-org-bullet-char)
                          (funcall jirassic-org-bullet-char level)
                        jirassic-org-bullet-char)))
@@ -251,7 +242,6 @@ its parent container will consider indentation."
 ;;; `adf-ordered-list'
 (cl-defmethod jirassic--serialize-to-org ((ordered-list adf-ordered-list) &optional level)
   "Convert ORDERED-LIST to an org mode string at LEVEL."
-  (declare (pure t) (side-effect-free t))
   (jirassic--s-join
    (seq-map-indexed
     (lambda (list-item index)
@@ -274,20 +264,17 @@ LEVEL is ignored because `adf-date' is an inline node, so only its
 parent container will consider indentation.
 
 Formats to a date without time components."
-  (declare (pure t) (side-effect-free t))
   (format-time-string "<%Y-%m-%d %a>"
                       (seconds-to-time (string-to-number (adf-date-timestamp date)))))
 
 ;;; `adf-hard-break'
 (cl-defmethod jirassic--serialize-to-org ((_hard-break adf-hard-break) &optional _level)
   "Serialize a hard-break as a newline character, LEVEL is ignored."
-  (declare (pure t) (side-effect-free t))
   "\n")
 
 ;;; `adf-code-block'
 (cl-defmethod jirassic--serialize-to-org ((code-block adf-code-block) &optional _level)
   "Serialize CODE-BLOCK as an org source block, LEVEL is ignored."
-  (declare (pure t) (side-effect-free t))
   (let ((language (adf-code-block-language code-block))
         (content (adf-code-block-content code-block)))
     (concat
@@ -304,7 +291,6 @@ Formats to a date without time components."
 ;;; `adf-blockquote'
 (cl-defmethod jirassic--serialize-to-org ((blockquote adf-blockquote) &optional _level)
   "Serialise BLOCKQUOTE to an `org-mode' quote block."
-  (declare (pure t) (side-effect-free t))
   (format "\n#+BEGIN_QUOTE\n%s\n#+END_QUOTE\n"
           (jirassic-serializer--serialize-content-list (adf-blockquote-content blockquote))))
 
@@ -314,7 +300,6 @@ Formats to a date without time components."
 
 The block name is the ADF panel type upper-cased (e.g. INFO, WARNING).
 When a panel has no panel type, fall back to the generic name PANEL."
-  (declare (pure t) (side-effect-free t))
   (let ((block-name (upcase (or (adf-panel-panel-type panel) "panel"))))
     (format "#+BEGIN_%s\n%s\n#+END_%s"
             block-name
@@ -324,7 +309,6 @@ When a panel has no panel type, fall back to the generic name PANEL."
 ;;; `adf-expand'
 (cl-defmethod jirassic--serialize-to-org ((expand adf-expand) &optional _level)
   "Serialise EXPAND to an `org-mode' special block."
-  (declare (pure t) (side-effect-free t))
   (let ((title (adf-expand-title expand)))
     (format "#+BEGIN_EXPAND%s\n%s\n#+END_EXPAND"
             (if (and title (not (string-empty-p title)))
@@ -340,7 +324,6 @@ Because of the limitations of `org-mode' tables compared to Atlassian
 tables, like cells that span multiple columns or rows, or cells that
 contain nested expands. If the table is an unsupported configuration,
 return a placeholder."
-  (declare (pure t))
   (if-let ((reason-unsupported (jirassic-serializer--table-unsupported table)))
       (progn (warn "Cannot serialize table, it has a cell that %s" reason-unsupported)
              ;; Fall back to the default handler that will return a placeholder.

@@ -22,7 +22,9 @@
                   "#+category: ${issue-summary}\n\n"
                   "${issue-description}"))
      :unnarrowed t))
-  "Default org-roam Jira capture templates.")
+  "Default org-roam Jira capture templates."
+  :type '(repeat sexp)
+  :group 'jirassic)
 
 (cl-defun jirassic-org-roam-capture (key-or-url &key goto keys node info props templates)
   "Capture a Jira issue form KEY-OR-URL using an Org-roam template.
@@ -30,7 +32,8 @@
 ISSUE-KEY can be either a normal Jira issue key, eg. `XYZ-123',
 or a full URL to the issue.
 
-GOTO and KEYS function the same as they do in `org-roam-capture'.
+GOTO, KEYS, NODE, INFO, and PROPS function the same as they do in
+`org-roam-capture'.
 TEMPLATES is a list of Org-roam templates to use for capturing,
 and defaults to `jirassic-org-roam-capture-templates'.
 
