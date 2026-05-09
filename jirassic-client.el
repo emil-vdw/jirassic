@@ -31,7 +31,7 @@
   (caddr err))
 
 (defun jirassic-get-issue (issue-key)
-  "Asynchronously fetch a Jira issue by ISSUE-KEY and resolve a `jira-issue' struct.
+  "Asynchronously fetch Jira issue with ISSUE-KEY, resolving a `jira-issue' struct.
 
 Signals `jirassic-http-error' on HTTP or network failure and
 `jirassic-error' for configuration problems (missing host or credentials)."
@@ -54,7 +54,7 @@ Signals `jirassic-http-error' on HTTP or network failure and
     promise))
 
 (defun jirassic-client--http-error-data (plz-err)
-  "Extract (CODE MESSAGE) from PLZ-ERR for use as `jirassic-http-error' signal data."
+  "Extract (CODE MESSAGE) from PLZ-ERR for `jirassic-http-error' signal data."
   (let* ((response (plz-error-response plz-err))
          (code (when response (plz-response-status response)))
          (message (or (plz-error-message plz-err)

@@ -18,7 +18,8 @@
   "Character used by default for org bullet lists.
 
 Value may be one of the supported org bullet characters or a function
-that takes the indentation level as an argument and returns one of those characters."
+that takes the indentation level as an argument and returns one of
+those characters."
   :type '(choice (const :tag "-" "-")
                  (const :tag "+" "+")
                  (const :tag "*" "*")
@@ -31,7 +32,9 @@ that takes the indentation level as an argument and returns one of those charact
   "Whether sibling headings are serialized with a blank line in between them.
 
 Defaults to the value of heading in `org-blank-before-new-entry', t if
-set to auto or t.")
+set to auto or t."
+  :type 'boolean
+  :group 'jirassic)
 
 (defvar jirassic-serializer--supported-marks
   '(code em link strike strong subsup underline)
@@ -61,7 +64,6 @@ characters are displayed verbatim rather than as formatting.")
   "Warn the user and return a placeholder of unsupported NODE."
   ;; This is a fallback serializer that is only meant to be dispatched
   ;; when no specific serializer is defined for the given node type.
-  (declare (pure t) (side-effect-free t))
   (let ((node-type (cl-type-of node)))
     (warn "Jirassic serializer doesn't support serializing %s" node-type)
     (format "###unsupported ADF node: %s###" node-type)))
@@ -133,7 +135,6 @@ LEVEL is ignored because `adf-text' is an inline node, so only its
 parent container will consider indentation.
 
 Only applies the first supported mark because of org syntax limitations."
-  (declare (pure t))
   (let (;; Get the first mark that is supported by the serializer (if any).
         (mark (car (seq-filter
                     (lambda (mark) (member (adf-mark-type mark)
@@ -416,7 +417,9 @@ return a placeholder."
            " |")))
 
 (defun jirassic--column-min-width (column)
-  "Determine the min width needed for `adf-table-header' or `adf-table-cell' cells in COLUMN."
+  "Determine the min width needed for cells in COLUMN.
+
+COLUMN may contain `adf-table-header' or `adf-table-cell' nodes."
   (declare (pure t) (side-effect-free t))
   (apply #'max
          (mapcar (lambda (cell)
@@ -508,11 +511,7 @@ A Cell is unsupported if:
   "Split STRING in leading whitespace, center string and trailing spaces.
 
 Returns a three element list containing the leading whitespace, center
-string and trailing whitespace characters.
-
-Example:
-  (jirassic-serializer--split-whitespace \"  some string \")
-  => '(\"  \" \"some string\" \" \")"
+string and trailing whitespace characters."
   (declare (pure t) (side-effect-free t))
   (string-match "\\`\\(\\s-*\\)\\(.*?\\)\\(\\s-*\\)\\'" string)
   (list (match-string 1 string)

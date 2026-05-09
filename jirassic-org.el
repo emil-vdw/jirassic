@@ -21,6 +21,8 @@
   :type '(alist :key-type string :value-type string)
   :group 'jirassic)
 
+(defvar org-capture-link-is-already-stored)
+
 (defvar jirassic-current-issue nil
   "The `jira-issue' currently being captured.
 
@@ -54,7 +56,7 @@ GOTO and KEYS are passed to `org-capture' directly."
           (org-capture-link-is-already-stored t))
       (org-capture goto keys))))
 
-(aio-defun jirassic-insert-issue (key &optional level)
+(aio-defun jirassic-insert-issue (key &optional _level)
   "Fetch Jira issue with KEY and insert at point as an org heading at LEVEL."
   (interactive "sIssue key: ")
   (let* ((issue (aio-await (jirassic-get-issue key))))
@@ -84,7 +86,8 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
 (defun jirassic-org--issue-properties (issue &optional extra-drawer-props)
   "Return a plist of ISSUE props for template substitution.
 
-EXTRA-DRAWER-PROPS is an alist of extra props to include in the formatted org drawer."
+EXTRA-DRAWER-PROPS is an alist of extra props to include in the
+formatted org property drawer."
   (let* ((issue-summary (jira-issue-summary issue))
          (issue-key (jira-issue-key issue))
          (issue-summary-slug (replace-regexp-in-string
