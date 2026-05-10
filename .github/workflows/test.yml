@@ -49,10 +49,14 @@ jobs:
       with:
         version: 'snapshot'
 
+    - name: Clean
+      run: make clean
+
+    - name: Package
+      run: make package
+
+    - name: Install dependencies
+      run: make install
+
     - name: Run tests
-      run: |
-        eask clean all
-        eask package
-        eask install
-        eask compile
-        eask test ert tests/*
+      run: make test

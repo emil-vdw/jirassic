@@ -1,6 +1,12 @@
 FILES ?= ./test/*.el
 
-.PHONY: install lint test
+.PHONY: clean package install lint test
+clean:
+	eask clean all
+
+package:
+	eask package
+
 install:
 	eask install
 
@@ -9,4 +15,5 @@ lint:
 	eask lint checkdoc
 
 test:
+	eask compile
 	eask test ert $(FILES)
