@@ -361,7 +361,7 @@ positive values promote headings.")
 (defun jirassic--content-contains-node (content node-types)
   "Return node type if that node in CONTENT has a type in NODE-TYPES."
   (seq-some (lambda (child)
-              (seq-contains-p node-types (cl-type-of child) #'eq))
+              (seq-contains-p node-types (type-of child) #'eq))
             content))
 
 (provide 'jirassic-jira)

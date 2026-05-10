@@ -64,7 +64,7 @@ characters are displayed verbatim rather than as formatting.")
   "Warn the user and return a placeholder of unsupported NODE."
   ;; This is a fallback serializer that is only meant to be dispatched
   ;; when no specific serializer is defined for the given node type.
-  (let ((node-type (cl-type-of node)))
+  (let ((node-type (type-of node)))
     (warn "Jirassic serializer doesn't support serializing %s" node-type)
     (format "###unsupported ADF node: %s###" node-type)))
 
