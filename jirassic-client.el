@@ -58,7 +58,7 @@ Signals `jirassic-http-error' on HTTP or network failure and
   (let* ((response (plz-error-response plz-err))
          (code (when response (plz-response-status response)))
          (message (or (plz-error-message plz-err)
-                      (when-let (curl-err (plz-error-curl-error plz-err))
+                      (when-let* ((curl-err (plz-error-curl-error plz-err)))
                         (format "curl error %d: %s" (car curl-err) (cdr curl-err))))))
     (list code message)))
 

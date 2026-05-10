@@ -73,7 +73,7 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
                         ("issue-priority" ,(jira-issue-priority issue))
                         ("issue-project-key" ,(jira-project-key (jira-issue-project issue)))
                         ("issue-project-name" ,(jira-project-name (jira-issue-project issue)))))
-         (creator-props (when-let (creator (jira-issue-creator issue))
+         (creator-props (when-let* ((creator (jira-issue-creator issue)))
                           `(("issue-creator-email" ,(jira-user-email creator))
                             ("issue-creator-display-name" ,(jira-user-display-name creator))))))
     (concat ":PROPERTIES:\n"

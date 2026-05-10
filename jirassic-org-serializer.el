@@ -199,7 +199,7 @@ parent container will consider indentation."
 LEVEL is ignored because `adf-inline-card' is an inline node, so only
 its parent container will consider indentation."
   ;; The card will only ever contain a URL or DATA but never both.
-  (if-let ((url (adf-inline-card-url card)))
+  (if-let* ((url (adf-inline-card-url card)))
       ;; Simple link if we only have the URL
       (format "[[%s]]" url)
     ;; Otherwise, format to a named link using the JSONLD data.
@@ -324,7 +324,7 @@ Because of the limitations of `org-mode' tables compared to Atlassian
 tables, like cells that span multiple columns or rows, or cells that
 contain nested expands. If the table is an unsupported configuration,
 return a placeholder."
-  (if-let ((reason-unsupported (jirassic-serializer--table-unsupported table)))
+  (if-let* ((reason-unsupported (jirassic-serializer--table-unsupported table)))
       (progn (warn "Cannot serialize table, it has a cell that %s" reason-unsupported)
              ;; Fall back to the default handler that will return a placeholder.
              (cl-call-next-method))
