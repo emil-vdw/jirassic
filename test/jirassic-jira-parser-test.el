@@ -210,6 +210,10 @@
   (let ((rule (jirassic-parse-adf-node '((type . "rule")))))
     (should (cl-typep rule 'adf-rule))))
 
+(ert-deftest jirassic-parser-test-parse-hard-break ()
+  (let ((node (jirassic-parse-adf-node '((type . "hardBreak")))))
+    (should (cl-typep node 'adf-hard-break))))
+
 (ert-deftest jirassic-parser-test-parse-bullet-list ()
   (let* ((bullet-list
           (jirassic-parse-adf-node
@@ -343,6 +347,36 @@
     (should (cl-typep card 'adf-inline-card))
     (should (eq (adf-inline-card-url card) nil))
     (should (equal (adf-inline-card-data card) data))))
+
+(ert-deftest jirassic-parser-test-parse-mention ()
+  ;; With text
+  (let ((mention (jirassic-parse-adf-node
+                  '((type . "mention")
+                    (attrs (id . "5dd37afd98792b0ef9d9c3dc")
+                           (text . "@John Doe")
+                           (accessLevel . "APPLICATION"))))))
+    (should (cl-typep mention 'adf-mention))
+    (should (string= (adf-mention-id mention) "5dd37afd98792b0ef9d9c3dc"))
+    (should (string= (adf-mention-text mention) "@John Doe")))
+
+  ;; text is optional and may be absent
+  (let ((mention (jirassic-parse-adf-node
+                  '((type . "mention")
+                    (attrs (id . "5dd37afd98792b0ef9d9c3dc"))))))
+    (should (cl-typep mention 'adf-mention))
+    (should (string= (adf-mention-id mention) "5dd37afd98792b0ef9d9c3dc"))
+    (should (eq (adf-mention-text mention) nil))))
+
+(ert-deftest jirassic-parser-test-parse-status ()
+  (let ((status (jirassic-parse-adf-node
+                 '((type . "status")
+                   (attrs (text . "In Progress")
+                          (color . "blue")
+                          (localId . "abc-123")
+                          (style . ""))))))
+    (should (cl-typep status 'adf-status))
+    (should (string= (adf-status-text status) "In Progress"))
+    (should (string= (adf-status-color status) "blue"))))
 
 (ert-deftest jirassic-parser-test-parse-issue ()
   (let ((issue (jirassic--parse-issue

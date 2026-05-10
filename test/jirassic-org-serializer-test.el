@@ -112,7 +112,15 @@
 ;;; `adf-hard-break'
 (ert-deftest jirassic-serializer-test-hard-break ()
   (should (string= (jirassic--serialize-to-org (make-adf-hard-break))
-                   "\n")))
+                   "\n"))
+
+  ;; Inside a paragraph the hard break splits the line.
+  (should (string= (jirassic--serialize-to-org
+                    (make-adf-paragraph
+                     :content (list (make-adf-text :text "line one")
+                                    (make-adf-hard-break)
+                                    (make-adf-text :text "line two"))))
+                   "line one\nline two")))
 
 ;;; `adf-rule'
 (ert-deftest jirassic-serializer-test-rule ()
