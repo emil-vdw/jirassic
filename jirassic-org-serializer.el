@@ -65,7 +65,7 @@ characters are displayed verbatim rather than as formatting.")
   ;; This is a fallback serializer that is only meant to be dispatched
   ;; when no specific serializer is defined for the given node type.
   (let ((node-type (type-of node)))
-    (warn "Jirassic serializer doesn't support serializing %s" node-type)
+    (lwarn 'jirassic :warning "Jirassic serializer doesn't support serializing %s" node-type)
     (format "###unsupported ADF node: %s###" node-type)))
 
 ;;; `jira-issue'
@@ -106,8 +106,8 @@ serialization."
                                              jirassic-serializer--heading-unsupported-marks))
                                      marks)))
                   (when unsupported
-                    (warn "Dropping mark(s) %s from heading text: not supported in org headings"
-                          (mapcar #'adf-mark-type unsupported)))
+                    (lwarn 'jirassic :warning "Dropping mark(s) %s from heading text: not supported in org headings"
+                           (mapcar #'adf-mark-type unsupported)))
                   (jirassic--serialize-to-org
                    (make-adf-text
                     :text (adf-text-text content)
@@ -161,7 +161,7 @@ Only applies the first supported mark because of org syntax limitations."
                             "^{%s}")    ;superscript
                           center-text))
              ('link      (format "[[%s][%s]]" (alist-get 'href (adf-mark-attrs mark)) center-text))
-             (type (warn "Unsupported ADF text mark %s" type)))
+             (type (lwarn 'jirassic :warning "Unsupported ADF text mark %s" type)))
            ;; Put the trailing spaces back.
            trailing-space))
       full-text)))
@@ -325,7 +325,7 @@ tables, like cells that span multiple columns or rows, or cells that
 contain nested expands. If the table is an unsupported configuration,
 return a placeholder."
   (if-let* ((reason-unsupported (jirassic-serializer--table-unsupported table)))
-      (progn (warn "Cannot serialize table, it has a cell that %s" reason-unsupported)
+      (progn (lwarn 'jirassic :warning "Cannot serialize table, it has a cell that %s" reason-unsupported)
              ;; Fall back to the default handler that will return a placeholder.
              (cl-call-next-method))
     (let* (;; We get a two dimensional list of serialized cell

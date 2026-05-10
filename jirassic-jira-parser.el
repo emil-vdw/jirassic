@@ -51,7 +51,7 @@
       ("tableCell" (make-adf-table-cell
                     :content (jirassic--parse-content-list .content)
                     :row-span .attrs.rowspan :col-span .attrs.colspan))
-      (_ (warn "Unsupported ADF node type %s" .type)
+      (_ (lwarn 'jirassic :warning "Unsupported ADF node type %s" .type)
          ;; Return `nil' so this unsupported node can be filtered out.
          nil))))
 
