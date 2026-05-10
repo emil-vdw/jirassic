@@ -5,7 +5,7 @@
 ;; Maintainer: Emil van der Westhuizen <vdwemil@protonmail.com>
 ;; Created: 19 April 2025
 ;; Version: 0.1
-;; Package-Requires: ((emacs "27.1") (org "9.5") (aio "1.0") (plz "0.9.1") (seq "2.24"))
+;; Package-Requires: ((emacs "28.2") (org "9.5") (aio "1.0") (plz "0.9.1") (seq "2.24"))
 ;; Homepage: https://github.com/emil-vdw/jirassic
 ;; Keywords: tools, convenience, jira
 

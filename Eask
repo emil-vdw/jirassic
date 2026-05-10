@@ -23,7 +23,7 @@
  "jirassic-org.el"
  "jirassic-org-roam.el")
 
-(depends-on "emacs" "26.1")
+(depends-on "emacs" "28.2")
 (depends-on "aio" "1.0")
 (depends-on "plz" "	0.9.1")
 (depends-on "org" "9.5")
