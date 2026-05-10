@@ -8,12 +8,11 @@ package:
 	eask package
 
 install:
-	eask install
+	eask install-deps --dev
 
 lint:
 	eask compile --strict
 	eask lint checkdoc
 
 test:
-	eask compile
 	eask test ert $(FILES)
