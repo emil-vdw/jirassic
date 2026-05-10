@@ -117,7 +117,7 @@ serialization."
                                     jirassic-serializer--heading-unsupported-marks))
                             marks)))))
                (t (jirassic--serialize-to-org content))))
-           (adf-heading-content heading))))
+           (adf-heading-content heading) "")))
 
 ;;; `adf-paragraph'
 (cl-defmethod jirassic--serialize-to-org ((paragraph adf-paragraph) &optional _level)
@@ -367,7 +367,7 @@ return a placeholder."
      (mapcar
       (lambda (cell)
         (mapconcat #'jirassic--serialize-to-org
-                   (jirassic--table-cell-content cell)))
+                   (jirassic--table-cell-content cell) ""))
       (adf-table-row-content row)))
    rows))
 
@@ -408,7 +408,7 @@ COLUMN may contain `adf-table-header' or `adf-table-cell' nodes."
          (mapcar (lambda (cell)
                    (let ((serialized-content
                           (mapconcat #'jirassic--serialize-to-org
-                                     (jirassic--table-cell-content cell))))
+                                     (jirassic--table-cell-content cell) "")))
                      (- (length serialized-content)
                         ;; When org hides emphasis markers,
                         ;; adjust the length so it matches the
