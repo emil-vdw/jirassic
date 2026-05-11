@@ -12,7 +12,6 @@
 
 (require 'aio)
 (require 'plz)
-(require 'jirassic)
 (require 'jirassic-jira-parser)
 
 (define-error 'jirassic-http-error "Jira HTTP error" 'jirassic-error)
