@@ -136,6 +136,23 @@ formatted org property drawer."
                                (jira-issue-description issue) 1))
           :issue-property-drawer issue-property-drawer)))
 
+(defun jirassic-org--ediff-pull-buffers (source-buffer pull-buffer &optional extra-kill-buffers)
+  "Ediff SOURCE-BUFFER against PULL-BUFFER, restoring window state on quit.
+
+When the user quits ediff, PULL-BUFFER and any buffers in EXTRA-KILL-BUFFERS
+are killed, and the window configuration captured at call time is restored."
+  (let ((window-config (current-window-configuration))
+        (kill-buffers (cons pull-buffer extra-kill-buffers)))
+    (ediff-buffers source-buffer pull-buffer
+                   (list (lambda ()
+                           (add-hook 'ediff-cleanup-hook
+                                     (lambda ()
+                                       (dolist (buf kill-buffers)
+                                         (when (buffer-live-p buf)
+                                           (kill-buffer buf)))
+                                       (set-window-configuration window-config))
+                                     nil t))))))
+
 (defun jirassic-org-pull ()
   "Pull the latest version of the Jira issue at point and ediff it locally.
 
@@ -189,19 +206,8 @@ compared against the current subtree using `ediff'."
           (with-current-buffer source-indirect
             (goto-char source-entry-start)
             (org-narrow-to-subtree))
-          ;; Store and restore the window configuration after the
-          ;; ediff session concludes
-          (let ((window-config (current-window-configuration)))
-            (ediff-buffers source-indirect pull-buffer
-                           (list (lambda ()
-                                   (add-hook 'ediff-cleanup-hook
-                                             (lambda ()
-                                               (when (buffer-live-p source-indirect)
-                                                 (kill-buffer source-indirect))
-                                               (when (buffer-live-p pull-buffer)
-                                                 (kill-buffer pull-buffer))
-                                               (set-window-configuration window-config))
-                                             nil t)))))
+          (jirassic-org--ediff-pull-buffers source-indirect pull-buffer
+                                            (list source-indirect))
           (setq ediff-handover t))
       (unless ediff-handover
         (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
