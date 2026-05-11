@@ -378,6 +378,13 @@
     (should (string= (adf-status-text status) "In Progress"))
     (should (string= (adf-status-color status) "blue"))))
 
+(ert-deftest jirassic-parser-test-parse-date ()
+  (let ((date (jirassic-parse-adf-node
+               '((type . "date")
+                 (attrs (timestamp . "1582152559"))))))
+    (should (cl-typep date 'adf-date))
+    (should (string= (adf-date-timestamp date) "1582152559"))))
+
 (ert-deftest jirassic-parser-test-parse-issue ()
   (let ((issue (jirassic--parse-issue
                 '((self . "https://acme.atlassian.net/rest/api/3/issue/10001")

@@ -188,6 +188,17 @@ parent container will consider indentation."
                    (concat "@" id))))
     (format "[[mention:%s][%s]]" id text)))
 
+;;; `adf-date'
+(cl-defmethod jirassic--serialize-to-org ((date adf-date) &optional _level)
+  "Serialize DATE to an active org timestamp, LEVEL is ignored.
+
+The ADF timestamp is interpreted as seconds since the epoch and formatted
+in UTC so the output is stable regardless of the host's timezone."
+  (format-time-string "<%Y-%m-%d %a>"
+                      (seconds-to-time
+                       (string-to-number (or (adf-date-timestamp date) "")))
+                      t))
+
 ;;; `adf-status'
 (cl-defmethod jirassic--serialize-to-org ((status adf-status) &optional _level)
   "Serialize a STATUS badge to an org string, LEVEL is ignored."

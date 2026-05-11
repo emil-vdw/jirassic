@@ -34,6 +34,8 @@
       ;;         (text . "@John Doe")
       ;;         (accessLevel . "APPLICATION")))
       ("mention" (make-adf-mention :id .attrs.id :text .attrs.text))
+      ;; ((type . "date") (attrs (timestamp . "1582070400000")))
+      ("date" (make-adf-date :timestamp .attrs.timestamp))
       ;; ((type . "status")
       ;;  (attrs (text . "In Progress")
       ;;         (color . "blue")
