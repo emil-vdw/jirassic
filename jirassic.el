@@ -16,14 +16,8 @@
 ;; Provides an Org centered Jira client.
 
 ;;; Code:
+(require 'jirassic-core)
 (require 'jirassic-org)
-
-(defgroup jirassic nil
-  "Org centered Jira client."
-  :link '(url-link "https://github.com/emil-vdw/jirassic")
-  :group 'tool)
-
-(define-error 'jirassic-error "Jirassic error")
 
 (provide 'jirassic)
 ;;; jirassic.el ends here

@@ -9,7 +9,9 @@
 
 ;;; Code:
 (require 'aio)
+(require 'ediff)
 (require 'org)
+(require 'org-capture)
 
 (require 'jirassic-client)
 (require 'jirassic-jira-parser)
@@ -47,14 +49,24 @@ GOTO and KEYS are passed to `org-capture' directly."
                       (match-string 1 key-or-url)))
                   key-or-url))
          (issue (aio-wait-for (jirassic-get-issue key))))
-    (apply #'org-link-store-props (jirassic-org--issue-properties issue))
-    (let (;; Set `jirassic-current-issue' so that this can be used by
-          ;; sexps in the template.
-          (jirassic-current-issue issue)
-          ;; Prevent `org-capture' from invoking `org-store-link' and
-          ;; overwriting the link props we just stored.
-          (org-capture-link-is-already-stored t))
+    (jirassic-org--with-capture-context issue
       (org-capture goto keys))))
+
+(defmacro jirassic-org--with-capture-context (issue &rest body)
+  "Set up org capture context for ISSUE, then evaluate BODY.
+
+Stores the issue link properties for template substitution, binds
+`jirassic-current-issue' so that sexps in capture templates can
+access the full issue struct, and prevents `org-capture' from
+calling `org-store-link' and overwriting those properties."
+  (declare (indent 1)
+           (debug (form body)))
+  (let ((issue-var (make-symbol "issue")))
+    `(let ((,issue-var ,issue))
+       (apply #'org-link-store-props (jirassic-org--issue-properties ,issue-var))
+       (let ((jirassic-current-issue ,issue-var)
+             (org-capture-link-is-already-stored t))
+         ,@body))))
 
 (aio-defun jirassic-insert-issue (key &optional _level)
   "Fetch Jira issue with KEY and insert at point as an org heading at LEVEL."
@@ -123,6 +135,77 @@ formatted org property drawer."
                               (jirassic-adjust-heading-level
                                (jira-issue-description issue) 1))
           :issue-property-drawer issue-property-drawer)))
+
+(defun jirassic-org-pull ()
+  "Pull the latest version of the Jira issue at point and ediff it locally.
+
+The issue is identified by the `issue-key' property on the current entry.
+The remote issue is rendered with the org capture template referenced by
+the `issue-template-key' property, falling back to an interactive template
+prompt when that key no longer resolves.  The rendered result is then
+compared against the current subtree using `ediff'."
+  (interactive)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Not in an org-mode buffer"))
+  (let* ((source-buffer (current-buffer))
+         (source-entry-start (save-excursion (org-back-to-heading t) (point)))
+         (source-entry-level (org-current-level))
+         (issue-key (or (org-entry-get nil "issue-key")
+                        (user-error "No issue-key property on this heading")))
+         (template-entry (condition-case nil
+                             ;; Try to use the stored template key in
+                             ;; the org property drawer.
+                             (org-capture-select-template
+                              (org-entry-get nil "issue-template-key"))
+                           ;; If that doesn't match any template
+                           ;; anymore, prompt the user to select one
+                           ;; normally.
+                           (error (org-capture-select-template))))
+         (template-string (nth 4 template-entry))
+         (issue (aio-wait-for (jirassic-get-issue issue-key)))
+         (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
+         (source-indirect nil)
+         ;; Track whether setup and handover to ediff was successful.
+         (ediff-handover nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer pull-buffer
+            (org-mode)
+            (jirassic-org--with-capture-context issue
+              (let ((org-capture-plist (list :template template-string
+                                             :buffer pull-buffer)))
+                (insert (string-replace "%?" "" (org-capture-fill-template)))))
+            (goto-char (point-min))
+            ;; Make sure that the both entries are at the same level
+            (when (org-at-heading-p)
+              (let ((delta (- source-entry-level (org-current-level))))
+                (cond ((> delta 0) (dotimes (_ delta) (org-demote-subtree)))
+                      ((< delta 0) (dotimes (_ (- delta)) (org-promote-subtree))))))
+            (set-buffer-modified-p nil))
+          (setq source-indirect
+                (make-indirect-buffer source-buffer
+                                      (format "*%s-current*" issue-key)
+                                      t))
+          (with-current-buffer source-indirect
+            (goto-char source-entry-start)
+            (org-narrow-to-subtree))
+          ;; Store and restore the window configuration after the
+          ;; ediff session concludes
+          (let ((window-config (current-window-configuration)))
+            (ediff-buffers source-indirect pull-buffer
+                           (list (lambda ()
+                                   (add-hook 'ediff-cleanup-hook
+                                             (lambda ()
+                                               (when (buffer-live-p source-indirect)
+                                                 (kill-buffer source-indirect))
+                                               (when (buffer-live-p pull-buffer)
+                                                 (kill-buffer pull-buffer))
+                                               (set-window-configuration window-config))
+                                             nil t)))))
+          (setq ediff-handover t))
+      (unless ediff-handover
+        (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
+        (when (buffer-live-p source-indirect) (kill-buffer source-indirect))))))
 
 (provide 'jirassic-org)
 ;;; jirassic-org.el ends here

@@ -9,6 +9,7 @@
 (require 'cl-lib)
 (require 'org)
 
+(require 'jirassic-core)
 (require 'jirassic-jira)
 
 (defvar jirassic-level-indent 2
