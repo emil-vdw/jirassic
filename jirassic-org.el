@@ -205,7 +205,7 @@ compared against the current subtree using `ediff'."
          (source-entry-start (save-excursion (org-back-to-heading t) (point)))
          (source-entry-level (org-current-level))
          (issue-key (or (org-entry-get nil "issue-key")
-                        (user-error "No issue-key property on this heading")))
+                        (user-error "No issue-key property on this entry")))
          (template-entry (let ((org-capture-templates jirassic-org-capture-templates))
                            (condition-case nil
                                ;; Try to use the stored template key in
