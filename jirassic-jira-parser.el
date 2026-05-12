@@ -73,26 +73,27 @@
 (defun jirassic--parse-issue (issue)
   "Parse a Jira ISSUE object."
   (let-alist issue
-   (make-jira-issue
-    :id .id :key .key
-    :url (when .self
-           (concat (replace-regexp-in-string "/rest/api/.*$" "" .self)
-                   "/browse/" .key))
-    :description (jirassic-parse-adf-node .fields.description)
-    :status .fields.status.name
-    :summary .fields.summary
-    :type .fields.issuetype.name
-    :priority .fields.priority.name
-    :creator (when .fields.creator
-               (make-jira-user
-                :account-id .fields.creator.accountId
-                :display-name .fields.creator.displayName
-                :email .fields.creator.emailAddress))
-    :project (when .fields.project
-               (make-jira-project
-                :id .fields.project.id
-                :key .fields.project.key
-                :name .fields.project.name)))))
+    (make-jira-issue
+     :id .id :key .key
+     :url (when .self
+            (concat (replace-regexp-in-string "/rest/api/.*$" "" .self)
+                    "/browse/" .key))
+     :description (when .fields.description
+                    (jirassic-parse-adf-node .fields.description))
+     :status .fields.status.name
+     :summary .fields.summary
+     :type .fields.issuetype.name
+     :priority .fields.priority.name
+     :creator (when .fields.creator
+                (make-jira-user
+                 :account-id .fields.creator.accountId
+                 :display-name .fields.creator.displayName
+                 :email .fields.creator.emailAddress))
+     :project (when .fields.project
+                (make-jira-project
+                 :id .fields.project.id
+                 :key .fields.project.key
+                 :name .fields.project.name)))))
 
 (defun jirassic--parse-doc (doc)
   "Parse an ADF DOC node."

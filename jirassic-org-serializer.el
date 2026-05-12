@@ -60,6 +60,10 @@ characters are displayed verbatim rather than as formatting.")
   (declare (pure t) (side-effect-free t))
   (apply #'concat (make-list num s)))
 
+(cl-defmethod jirassic--serialize-to-org ((_node null) &optional _level)
+  "Return empty string for nil nodes (e.g. issues with no description)."
+  "")
+
 ;;; Default serializer when there isn't one specific to the node type.
 (cl-defmethod jirassic--serialize-to-org ((node t) &optional _level)
   "Warn the user and return a placeholder of unsupported NODE."
