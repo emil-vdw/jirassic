@@ -18,6 +18,41 @@
 (require 'jirassic-org-serializer)
 
 
+(defcustom jirassic-org-capture-templates
+  '(("j" "Jira Issue" entry
+     (file org-default-notes-file)
+     "* %:issue-todo-keyword %:issue-summary\n%:issue-property-drawer\n\n%:issue-description%?"
+     :empty-lines 1
+     :jump-to-captured t))
+  "Org capture templates for Jira issues.
+
+These templates are used exclusively by `jirassic-org-capture' and
+`jirassic-org-pull'. These templates support substitution of Jira issue
+context.
+
+Besides the extra substitution vars, all of the standard
+`org-capture-templates' features apply.
+
+Available `%:' substitutions:
+
+  %:annotation            Org link to the issue (key as description).
+  %:issue-description     Issue body, serialized to Org.
+  %:issue-id              Internal Jira ID.
+  %:issue-key             Issue key, e.g. \"XYZ-123\".
+  %:issue-priority        Issue priority.
+  %:issue-project-key     Jira project key.
+  %:issue-project-name    Jira project name.
+  %:issue-property-drawer Org :PROPERTIES: drawer.
+  %:issue-status          Raw Jira status string.
+  %:issue-summary         Issue title.
+  %:issue-summary-slug    URL-safe slug of the summary.
+  %:issue-todo-keyword    Org TODO keyword (see `jirassic-jira-to-org-keyword-alist').
+  %:issue-type            Issue type (Bug, Story, etc.).
+  %:issue-url             URL of the issue."
+  :type (get 'org-capture-templates 'custom-type)
+  :set (lambda (s v) (set-default-toplevel-value s (org-capture-upgrade-templates v)))
+  :group 'jirassic)
+
 (defcustom jirassic-jira-to-org-keyword-alist nil
   "An alist mapping Jira status strings to Org TODO keyword strings."
   :type '(alist :key-type string :value-type string)
@@ -50,7 +85,8 @@ GOTO and KEYS are passed to `org-capture' directly."
                   key-or-url))
          (issue (aio-wait-for (jirassic-get-issue key))))
     (jirassic-org--with-capture-context issue
-      (org-capture goto keys))))
+      (let ((org-capture-templates jirassic-org-capture-templates))
+        (org-capture goto keys)))))
 
 (defmacro jirassic-org--with-capture-context (issue &rest body)
   "Set up org capture context for ISSUE, then evaluate BODY.
@@ -169,15 +205,16 @@ compared against the current subtree using `ediff'."
          (source-entry-level (org-current-level))
          (issue-key (or (org-entry-get nil "issue-key")
                         (user-error "No issue-key property on this heading")))
-         (template-entry (condition-case nil
-                             ;; Try to use the stored template key in
-                             ;; the org property drawer.
-                             (org-capture-select-template
-                              (org-entry-get nil "issue-template-key"))
-                           ;; If that doesn't match any template
-                           ;; anymore, prompt the user to select one
-                           ;; normally.
-                           (error (org-capture-select-template))))
+         (template-entry (let ((org-capture-templates jirassic-org-capture-templates))
+                           (condition-case nil
+                               ;; Try to use the stored template key in
+                               ;; the org property drawer.
+                               (org-capture-select-template
+                                (org-entry-get nil "issue-template-key"))
+                             ;; If that doesn't match any template
+                             ;; anymore, prompt the user to select one
+                             ;; normally.
+                             (error (org-capture-select-template)))))
          (template-string (nth 4 template-entry))
          (issue (aio-wait-for (jirassic-get-issue issue-key)))
          (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
