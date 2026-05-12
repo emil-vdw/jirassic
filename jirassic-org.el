@@ -155,7 +155,8 @@ formatted org property drawer."
           :issue-status issue-status
           :issue-todo-keyword (alist-get issue-status
                                          jirassic-jira-to-org-keyword-alist
-                                         issue-status)
+                                         issue-status
+                                         nil #'equal)
           :issue-type (jira-issue-type issue)
           :issue-priority (jira-issue-priority issue)
           :issue-creator-display-name (when creator (jira-user-display-name creator))
