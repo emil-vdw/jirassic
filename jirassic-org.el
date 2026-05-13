@@ -150,7 +150,7 @@ formatted org property drawer."
           :link (jira-issue-url issue)
           :description (jira-issue-summary issue)
           :annotation (org-link-make-string (jira-issue-url issue)
-                                       (jira-issue-key issue))
+                                            (jira-issue-key issue))
           :issue-id (jira-issue-id issue)
           :issue-status issue-status
           :issue-todo-keyword (alist-get issue-status
@@ -173,31 +173,44 @@ formatted org property drawer."
                                (jira-issue-description issue) 1))
           :issue-property-drawer issue-property-drawer)))
 
-(defun jirassic-org--ediff-pull-buffers (source-buffer pull-buffer &optional extra-kill-buffers)
+(defun jirassic-org--pull-ediff (source-buffer pull-buffer)
   "Ediff SOURCE-BUFFER against PULL-BUFFER, restoring window state on quit.
 
-When the user quits ediff, PULL-BUFFER and any buffers in EXTRA-KILL-BUFFERS
-are killed, and the window configuration captured at call time is restored."
-  (let ((window-config (current-window-configuration))
-        (kill-buffers (cons pull-buffer extra-kill-buffers)))
+When the user quits ediff, SOURCE-BUFFER and PULL-BUFFER are killed, and
+the window configuration captured at call time is restored."
+  (let ((window-config (current-window-configuration)))
     (ediff-buffers source-buffer pull-buffer
                    (list (lambda ()
                            (add-hook 'ediff-cleanup-hook
                                      (lambda ()
-                                       (dolist (buf kill-buffers)
+                                       (dolist (buf (list source-buffer pull-buffer))
                                          (when (buffer-live-p buf)
                                            (kill-buffer buf)))
-                                       (set-window-configuration window-config))
+                                       ;; Restore the window config
+                                       ;; after ediff's normal cleanup
+                                       (run-with-timer 0 nil
+                                                       (lambda () (set-window-configuration window-config))))
                                      nil t))))))
 
+(defun jirassic-org--buffer-contents-equal (buf-a buf-b)
+  "Return t if the contents of BUF-A and BUF-B are identical."
+  (let ((content-a (with-current-buffer buf-a
+                     (buffer-substring-no-properties (point-min) (point-max))))
+        (content-b (with-current-buffer buf-b
+                     (buffer-substring-no-properties (point-min) (point-max)))))
+    (string= content-a content-b)))
+
+;;;###autoload
 (defun jirassic-org-pull ()
   "Pull the latest version of the Jira issue at point and ediff it locally.
 
-The issue is identified by the `issue-key' property on the current entry.
-The remote issue is rendered with the org capture template referenced by
-the `issue-template-key' property, falling back to an interactive template
-prompt when that key no longer resolves.  The rendered result is then
-compared against the current subtree using `ediff'."
+This is meant to be used on a Jira issue that is captured as an org
+entry. The issue is identified by the `issue-key' property on the
+current entry. The remote issue is rendered with the org capture
+template referenced by the `issue-template-key' property, falling back
+to an interactive template prompt when that key no longer resolves. The
+rendered result is then compared against the current subtree using
+`ediff'."
   (interactive)
   (unless (derived-mode-p 'org-mode)
     (user-error "Not in an org-mode buffer"))
@@ -219,11 +232,16 @@ compared against the current subtree using `ediff'."
          (template-string (nth 4 template-entry))
          (issue (aio-wait-for (jirassic-get-issue issue-key)))
          (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
-         (source-indirect nil)
+         (source-indirect (make-indirect-buffer source-buffer
+                                                (format "*%s-current*" issue-key)
+                                                t))
          ;; Track whether setup and handover to ediff was successful.
          (ediff-handover nil))
     (unwind-protect
         (progn
+          ;; Expand the capture template into a temp buffer so we can
+          ;; diff it with the source entry that we are trying to
+          ;; update
           (with-current-buffer pull-buffer
             (org-mode)
             (jirassic-org--with-capture-context issue
@@ -237,16 +255,17 @@ compared against the current subtree using `ediff'."
                 (cond ((> delta 0) (dotimes (_ delta) (org-demote-subtree)))
                       ((< delta 0) (dotimes (_ (- delta)) (org-promote-subtree))))))
             (set-buffer-modified-p nil))
-          (setq source-indirect
-                (make-indirect-buffer source-buffer
-                                      (format "*%s-current*" issue-key)
-                                      t))
+
           (with-current-buffer source-indirect
             (goto-char source-entry-start)
             (org-narrow-to-subtree))
-          (jirassic-org--ediff-pull-buffers source-indirect pull-buffer
-                                            (list source-indirect))
-          (setq ediff-handover t))
+
+          (if (jirassic-org--buffer-contents-equal source-indirect pull-buffer)
+              (message "Issue %s has no new changes" issue-key)
+            (jirassic-org--pull-ediff source-indirect pull-buffer)
+            ;; At this point, the ediff session has started, and it will
+            ;; clean up when the session ends.
+            (setq ediff-handover t)))
       (unless ediff-handover
         (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
         (when (buffer-live-p source-indirect) (kill-buffer source-indirect))))))
