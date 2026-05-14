@@ -96,16 +96,23 @@ GOTO and KEYS are passed to `org-capture' directly."
                   key-or-url))
          (issue (aio-wait-for (jirassic-get-issue key)))
          (org-capture-templates jirassic-org-capture-templates)
-         ;; Resolve the template key up-front so we can record it on
-         ;; the captured entry for later use by `jirassic-org-pull'.
-         (template-key (or keys (car (org-capture-select-template))))
+         ;; Resolve the template up-front so we can record its key on
+         ;; the captured entry for later use by `jirassic-org-pull' and
+         ;; pick the right heading-adjust amount for its type.
+         (template-entry (or (and keys (assoc keys org-capture-templates))
+                             (org-capture-select-template)))
+         (template-key (car template-entry))
+         (template-type (nth 2 template-entry))
+         (description-level-adjust (if (eq template-type 'entry) 1 0))
          (extra-drawer-props
           (when jirassic-org-store-template-key
             `(("issue-template-key" ,template-key)))))
-    (jirassic-org--with-capture-context issue extra-drawer-props
-                                        (org-capture goto template-key))))
+    (jirassic-org--with-capture-context issue
+        extra-drawer-props
+        description-level-adjust
+      (org-capture goto template-key))))
 
-(defmacro jirassic-org--with-capture-context (issue extra-drawer-props &rest body)
+(defmacro jirassic-org--with-capture-context (issue extra-drawer-props description-level-adjust &rest body)
   "Set up org capture context for ISSUE, then evaluate BODY.
 
 Stores the issue link properties for template substitution, binds
@@ -114,15 +121,20 @@ access the full issue struct, and prevents `org-capture' from
 calling `org-store-link' and overwriting those properties.
 
 EXTRA-DRAWER-PROPS is an alist of extra properties to splice into
-the rendered `%:issue-property-drawer' substitution."
-  (declare (indent 2)
-           (debug (form form body)))
+the rendered `%:issue-property-drawer' substitution.
+
+DESCRIPTION-LEVEL-ADJUST controls how much the description's headings
+are promoted by."
+  (declare (indent 3)
+           (debug (form form form body)))
   (let ((issue-var (make-symbol "issue"))
-        (props-var (make-symbol "extra-drawer-props")))
+        (props-var (make-symbol "extra-drawer-props"))
+        (adjust-var (make-symbol "description-level-adjust")))
     `(let* ((,issue-var ,issue)
-            (,props-var ,extra-drawer-props))
+            (,props-var ,extra-drawer-props)
+            (,adjust-var ,description-level-adjust))
        (apply #'org-link-store-props
-              (jirassic-org--issue-properties ,issue-var ,props-var))
+              (jirassic-org--issue-properties ,issue-var ,props-var ,adjust-var))
        (let ((jirassic-current-issue ,issue-var)
              (org-capture-link-is-already-stored t))
          ,@body))))
@@ -157,11 +169,17 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
                        "\n")
             "\n:END:")))
 
-(defun jirassic-org--issue-properties (issue &optional extra-drawer-props)
+(defun jirassic-org--issue-properties (issue &optional extra-drawer-props description-level-adjust)
   "Return a plist of ISSUE props for template substitution.
 
 EXTRA-DRAWER-PROPS is an alist of extra props to include in the
-formatted org property drawer."
+formatted org property drawer.
+
+DESCRIPTION-LEVEL-ADJUST is the amount to promote the headings in the
+serialized issue description by. Defaults to 1, which is appropriate
+for `entry'-type capture templates that put the issue summary as a
+level-1 heading and the description content under it. Pass 0 for
+`plain'-type templates where the description sits at file level."
   (let* ((issue-summary (jira-issue-summary issue))
          (issue-key (jira-issue-key issue))
          (issue-summary-slug (replace-regexp-in-string
@@ -196,7 +214,8 @@ formatted org property drawer."
           :issue-summary-slug issue-summary-slug
           :issue-description (jirassic--serialize-to-org
                               (jirassic-adjust-heading-level
-                               (jira-issue-description issue) 1))
+                               (jira-issue-description issue)
+                               (or description-level-adjust 1)))
           :issue-property-drawer issue-property-drawer)))
 
 (defun jirassic-org--pull-ediff (source-buffer pull-buffer)
@@ -219,12 +238,15 @@ the window configuration captured at call time is restored."
                                      nil t))))))
 
 (defun jirassic-org--buffer-contents-equal (buf-a buf-b)
-  "Return t if the contents of BUF-A and BUF-B are identical."
-  (let ((content-a (with-current-buffer buf-a
-                     (buffer-substring-no-properties (point-min) (point-max))))
-        (content-b (with-current-buffer buf-b
-                     (buffer-substring-no-properties (point-min) (point-max)))))
-    (string= content-a content-b)))
+  "Return t if the contents of BUF-A and BUF-B are identical.
+
+Trailing newlines are ignored when comparing."
+  (cl-flet ((trimmed (buf)
+              (with-current-buffer buf
+                (string-trim-right
+                 (buffer-substring-no-properties (point-min) (point-max))
+                 "\n+"))))
+    (string= (trimmed buf-a) (trimmed buf-b))))
 
 ;;;###autoload
 (defun jirassic-org-pull ()
@@ -274,6 +296,7 @@ template body must be a literal string."
                                    (org-back-to-heading t) (point))))
            (source-entry-level (when (eq template-type 'entry)
                                  (org-current-level)))
+           (description-level-adjust (if (eq template-type 'entry) 1 0))
            (extra-drawer-props
             (when jirassic-org-store-template-key
               `(("issue-template-key" ,template-key))))
@@ -291,14 +314,13 @@ template body must be a literal string."
             ;; update.
             (with-current-buffer pull-buffer
               (org-mode)
-              (jirassic-org--with-capture-context issue extra-drawer-props
+              (jirassic-org--with-capture-context issue
+                  extra-drawer-props
+                  description-level-adjust
                 (let ((org-capture-plist (list :template template-string
                                                :buffer pull-buffer)))
-                  ;; `org-capture-fill-template' leaves the `%?' cursor
-                  ;; marker in the output; it's normally stripped later
-                  ;; in `org-capture--position-cursor'. We invoke the
-                  ;; filler directly, so remove the marker manually.
                   (insert (org-capture-fill-template))
+                  ;; Removes the `%?' cursor marker
                   (org-capture--position-cursor (point-min) (point-max))))
               (goto-char (point-min))
               ;; Make sure that both entries are at the same level

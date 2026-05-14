@@ -50,12 +50,16 @@ Org-roam template. For a full list of available variables, see the
                     key-or-url))
            (issue (aio-await (jirassic-get-issue key)))
            (templates (or templates jirassic-org-roam-capture-templates))
-           ;; Resolve the template key up-front so we can record it on
-           ;; the captured node for later use by `jirassic-org-roam-pull'.
-           (template-key
-            (or keys
-                (car (let ((org-capture-templates templates))
-                       (org-capture-select-template)))))
+           ;; Resolve the template up-front so we can record its key on
+           ;; the captured node for later use by `jirassic-org-roam-pull'
+           ;; and pick the right heading-adjust amount for its type.
+           (template-entry
+            (let ((org-capture-templates templates))
+              (or (and keys (assoc keys org-capture-templates))
+                  (org-capture-select-template))))
+           (template-key (car template-entry))
+           (template-type (nth 2 template-entry))
+           (description-level-adjust (if (eq template-type 'entry) 1 0))
            (extra-drawer-props
             `((ROAM_ALIASES ,key)
               ,@(when jirassic-org-store-template-key
@@ -65,8 +69,10 @@ Org-roam template. For a full list of available variables, see the
        :keys template-key
        :node (or node (org-roam-node-create))
        :info (seq-concatenate 'list
-                              (jirassic-org--issue-properties issue
-                                                              extra-drawer-props)
+                              (jirassic-org--issue-properties
+                               issue
+                               extra-drawer-props
+                               description-level-adjust)
                               info)
        :props props
        :templates templates))))
@@ -123,6 +129,7 @@ template body must be a literal string."
            (source-entry-start (when (eq entry-type 'entry)
                                  (save-excursion
                                    (org-back-to-heading t) (point))))
+           (description-level-adjust (if (eq entry-type 'entry) 1 0))
            (extra-drawer-props
             `((ROAM_ALIASES ,issue-key)
               (ID ,(org-roam-node-id node))
@@ -141,7 +148,9 @@ template body must be a literal string."
               (org-mode)
               (let ((org-roam-capture--node node)
                     (org-roam-capture--info
-                     (jirassic-org--issue-properties issue extra-drawer-props)))
+                     (jirassic-org--issue-properties issue
+                                                     extra-drawer-props
+                                                     description-level-adjust)))
                 ;; Unless capturing to an entry, diff the whole file,
                 ;; including the head because it is probably capturing
                 ;; at the file level.
