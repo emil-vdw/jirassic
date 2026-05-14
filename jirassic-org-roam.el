@@ -61,6 +61,7 @@ Org-roam template. For a full list of available variables, see the
        :templates (or templates
                       jirassic-org-roam-capture-templates)))))
 
+;;;###autoload
 (defun jirassic-org-roam-pull ()
   "Pull the latest Jira issue for the Org-roam node at point and ediff it locally.
 
@@ -70,23 +71,34 @@ The remote issue is rendered using the head of the selected template from
 bound for `${var}' substitution), and the result is compared against the
 node's file using `ediff'."
   (interactive)
-  (let* ((node (org-roam-node-at-point 'assert))
-         (node-file (or (org-roam-node-file node)
-                        (user-error "Node has no associated file")))
-         (issue-key (or (cdr (assoc-string "issue-key"
-                                           (org-roam-node-properties node)
-                                           t))
-                        (user-error "No issue-key property on this node")))
-         (template-entry (let ((org-capture-templates
-                                jirassic-org-roam-capture-templates))
-                           (org-capture-select-template)))
+  (let* ((source-buffer (current-buffer))
+         (node (or (org-roam-node-at-point)
+                   (user-error "Must be used in an org-roam node")))
+         (issue-key (or (org-entry-get nil "issue-key")
+                        (user-error "No issue-key property on this entry")))
+         (template-entry (let ((org-capture-templates jirassic-org-roam-capture-templates))
+                           (condition-case nil
+                               ;; Try to use the stored template key in
+                               ;; the org property drawer.
+                               (org-capture-select-template (org-entry-get nil "template-key"))
+                             ;; If that doesn't match any template
+                             ;; anymore, prompt the user to select one
+                             ;; normally.
+                             (error (org-capture-select-template)))))
+         (entry-type (nth 2 template-entry))
+         ;; These entry vars are only relevant when the entry type is 'entry or
+         (source-entry-level (org-current-level))
+         (source-entry-start (ignore-errors
+                               (save-excursion (org-back-to-heading t) (point))))
          (target (plist-get (nthcdr 4 template-entry) :target))
-         (head (or (and (eq (car-safe target) 'file+head)
-                        (caddr target))
-                   (user-error "Selected template has no file+head target")))
+         (target-type (car-safe target)) ; e.g. file+head, node, file+datetree
+         (head (and (string-match-p "head" (symbol-name target-type))
+                    (nth 2 target)))
+         (template (nth 3 template-entry))
          (issue (aio-wait-for (jirassic-get-issue issue-key)))
-         (source-buffer-existed (find-buffer-visiting node-file))
-         (source-buffer (find-file-noselect node-file))
+         (source-indirect (make-indirect-buffer source-buffer
+                                                (format "*%s-current*" issue-key)
+                                                t))
          (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
          ;; Track whether setup and handover to ediff was successful.
          (ediff-handover nil))
@@ -100,16 +112,26 @@ node's file using `ediff'."
                     issue
                     `((ROAM_ALIASES ,issue-key)
                       (ID ,(org-roam-node-id node))))))
-              (insert (org-roam-capture--fill-template head 'ensure-newline)))
+              ;; Unless capturing to an entry, diff the whole file,
+              ;; including the head because it is probably capturing
+              ;; at the file level.
+              (when (and (not (eq entry-type 'entry)) head)
+                (insert (org-roam-capture--fill-template head)))
+              ;; Insert but keep the point before the inserted text
+              ;; because we might need to manipulate the entry to
+              ;; match the level it's at in the source buffer.
+              (save-excursion (insert (org-roam-capture--fill-template template)))
+              (when (and (eq entry-type 'entry) (org-at-heading-p))
+                (let ((delta (- source-entry-level (org-current-level))))
+                  (cond ((> delta 0) (dotimes (_ delta) (org-demote-subtree)))
+                        ((< delta 0) (dotimes (_ (- delta)) (org-promote-subtree)))))))
             (set-buffer-modified-p nil))
-          (jirassic-org--ediff-pull-buffers source-buffer pull-buffer
-                                            (unless source-buffer-existed
-                                              (list source-buffer)))
+          (jirassic-org--pull-ediff source-indirect pull-buffer)
           (setq ediff-handover t))
+
       (unless ediff-handover
         (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
-        (unless source-buffer-existed
-          (when (buffer-live-p source-buffer) (kill-buffer source-buffer)))))))
+        (when (buffer-live-p source-indirect) (kill-buffer source-indirect))))))
 
 (provide 'jirassic-org-roam)
 ;;; jirassic-org-roam.el ends here
