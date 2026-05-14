@@ -58,6 +58,17 @@ Available `%:' substitutions:
   :type '(alist :key-type string :value-type string)
   :group 'jirassic)
 
+(defcustom jirassic-org-store-template-key t
+  "Whether to record the capture template key on captured Jira issues.
+
+When non-nil, `jirassic-org-capture' and `jirassic-org-roam-capture'
+will include an `issue-template-key' property in the rendered property
+drawer. `jirassic-org-pull' and `jirassic-org-roam-pull' then uses this
+property to re-render the issue with the same template, instead of
+prompting for one."
+  :type 'boolean
+  :group 'jirassic)
+
 (defvar org-capture-link-is-already-stored)
 
 (defvar jirassic-current-issue nil
@@ -83,23 +94,35 @@ GOTO and KEYS are passed to `org-capture' directly."
                     (when (string-match url-pattern key-or-url)
                       (match-string 1 key-or-url)))
                   key-or-url))
-         (issue (aio-wait-for (jirassic-get-issue key))))
-    (jirassic-org--with-capture-context issue
-      (let ((org-capture-templates jirassic-org-capture-templates))
-        (org-capture goto keys)))))
+         (issue (aio-wait-for (jirassic-get-issue key)))
+         (org-capture-templates jirassic-org-capture-templates)
+         ;; Resolve the template key up-front so we can record it on
+         ;; the captured entry for later use by `jirassic-org-pull'.
+         (template-key (or keys (car (org-capture-select-template))))
+         (extra-drawer-props
+          (when jirassic-org-store-template-key
+            `(("issue-template-key" ,template-key)))))
+    (jirassic-org--with-capture-context issue extra-drawer-props
+                                        (org-capture goto template-key))))
 
-(defmacro jirassic-org--with-capture-context (issue &rest body)
+(defmacro jirassic-org--with-capture-context (issue extra-drawer-props &rest body)
   "Set up org capture context for ISSUE, then evaluate BODY.
 
 Stores the issue link properties for template substitution, binds
 `jirassic-current-issue' so that sexps in capture templates can
 access the full issue struct, and prevents `org-capture' from
-calling `org-store-link' and overwriting those properties."
-  (declare (indent 1)
-           (debug (form body)))
-  (let ((issue-var (make-symbol "issue")))
-    `(let ((,issue-var ,issue))
-       (apply #'org-link-store-props (jirassic-org--issue-properties ,issue-var))
+calling `org-store-link' and overwriting those properties.
+
+EXTRA-DRAWER-PROPS is an alist of extra properties to splice into
+the rendered `%:issue-property-drawer' substitution."
+  (declare (indent 2)
+           (debug (form form body)))
+  (let ((issue-var (make-symbol "issue"))
+        (props-var (make-symbol "extra-drawer-props")))
+    `(let* ((,issue-var ,issue)
+            (,props-var ,extra-drawer-props))
+       (apply #'org-link-store-props
+              (jirassic-org--issue-properties ,issue-var ,props-var))
        (let ((jirassic-current-issue ,issue-var)
              (org-capture-link-is-already-stored t))
          ,@body))))
@@ -210,65 +233,92 @@ current entry. The remote issue is rendered with the org capture
 template referenced by the `issue-template-key' property, falling back
 to an interactive template prompt when that key no longer resolves. The
 rendered result is then compared against the current subtree using
-`ediff'."
+`ediff'.
+
+Only `entry' and `plain' capture template types are supported, and the
+template body must be a literal string."
   (interactive)
   (unless (derived-mode-p 'org-mode)
     (user-error "Not in an org-mode buffer"))
-  (let* ((source-buffer (current-buffer))
-         (source-entry-start (save-excursion (org-back-to-heading t) (point)))
-         (source-entry-level (org-current-level))
-         (issue-key (or (org-entry-get nil "issue-key")
+  (let* ((issue-key (or (org-entry-get nil "issue-key")
                         (user-error "No issue-key property on this entry")))
-         (template-entry (let ((org-capture-templates jirassic-org-capture-templates))
-                           (condition-case nil
-                               ;; Try to use the stored template key in
-                               ;; the org property drawer.
-                               (org-capture-select-template
-                                (org-entry-get nil "issue-template-key"))
-                             ;; If that doesn't match any template
-                             ;; anymore, prompt the user to select one
-                             ;; normally.
-                             (error (org-capture-select-template)))))
-         (template-string (nth 4 template-entry))
-         (issue (aio-wait-for (jirassic-get-issue issue-key)))
-         (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
-         (source-indirect (make-indirect-buffer source-buffer
-                                                (format "*%s-current*" issue-key)
-                                                t))
-         ;; Track whether setup and handover to ediff was successful.
-         (ediff-handover nil))
-    (unwind-protect
-        (progn
-          ;; Expand the capture template into a temp buffer so we can
-          ;; diff it with the source entry that we are trying to
-          ;; update
-          (with-current-buffer pull-buffer
-            (org-mode)
-            (jirassic-org--with-capture-context issue
-              (let ((org-capture-plist (list :template template-string
-                                             :buffer pull-buffer)))
-                (insert (string-replace "%?" "" (org-capture-fill-template)))))
-            (goto-char (point-min))
-            ;; Make sure that the both entries are at the same level
-            (when (org-at-heading-p)
-              (let ((delta (- source-entry-level (org-current-level))))
-                (cond ((> delta 0) (dotimes (_ delta) (org-demote-subtree)))
-                      ((< delta 0) (dotimes (_ (- delta)) (org-promote-subtree))))))
-            (set-buffer-modified-p nil))
+         (org-capture-templates jirassic-org-capture-templates)
+         (template-entry (condition-case nil
+                             ;; Try to use the stored template key in
+                             ;; the org property drawer.
+                             (org-capture-select-template
+                              (org-entry-get nil "issue-template-key"))
+                           ;; If that doesn't match any template
+                           ;; anymore, prompt the user to select one
+                           ;; normally.
+                           (error (org-capture-select-template))))
+         (template-key (car template-entry))
+         (template-type (nth 2 template-entry))
+         (template-string (nth 4 template-entry)))
+    (unless (memq template-type '(entry plain))
+      (user-error
+       "Unsupported capture template type `%s'; `jirassic-org-pull' only supports `entry' and `plain'"
+       template-type))
+    (unless (stringp template-string)
+      (user-error
+       "Unsupported capture template body; `jirassic-org-pull' requires a literal string template"))
+    (when (and (eq template-type 'entry)
+               (not (org-current-level)))
+      (user-error "Point must be on or under a heading for `entry' templates"))
+    (let* ((source-buffer (current-buffer))
+           (source-entry-start (when (eq template-type 'entry)
+                                 (save-excursion
+                                   (org-back-to-heading t) (point))))
+           (source-entry-level (when (eq template-type 'entry)
+                                 (org-current-level)))
+           (extra-drawer-props
+            (when jirassic-org-store-template-key
+              `(("issue-template-key" ,template-key))))
+           (issue (aio-wait-for (jirassic-get-issue issue-key)))
+           (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
+           (source-indirect (make-indirect-buffer source-buffer
+                                                  (format "*%s-current*" issue-key)
+                                                  t))
+           ;; Track whether setup and handover to ediff was successful.
+           (ediff-handover nil))
+      (unwind-protect
+          (progn
+            ;; Expand the capture template into a temp buffer so we can
+            ;; diff it with the source entry that we are trying to
+            ;; update.
+            (with-current-buffer pull-buffer
+              (org-mode)
+              (jirassic-org--with-capture-context issue extra-drawer-props
+                (let ((org-capture-plist (list :template template-string
+                                               :buffer pull-buffer)))
+                  ;; `org-capture-fill-template' leaves the `%?' cursor
+                  ;; marker in the output; it's normally stripped later
+                  ;; in `org-capture--position-cursor'. We invoke the
+                  ;; filler directly, so remove the marker manually.
+                  (insert (string-replace "%?" "" (org-capture-fill-template)))))
+              (goto-char (point-min))
+              ;; Make sure that both entries are at the same level
+              (when (and (eq template-type 'entry)
+                         (org-at-heading-p))
+                (let ((delta (- source-entry-level (org-current-level))))
+                  (cond ((> delta 0) (dotimes (_ delta) (org-demote-subtree)))
+                        ((< delta 0) (dotimes (_ (- delta)) (org-promote-subtree))))))
+              (set-buffer-modified-p nil))
 
-          (with-current-buffer source-indirect
-            (goto-char source-entry-start)
-            (org-narrow-to-subtree))
+            (when (eq template-type 'entry)
+              (with-current-buffer source-indirect
+                (goto-char source-entry-start)
+                (org-narrow-to-subtree)))
 
-          (if (jirassic-org--buffer-contents-equal source-indirect pull-buffer)
-              (message "Issue %s has no new changes" issue-key)
-            (jirassic-org--pull-ediff source-indirect pull-buffer)
-            ;; At this point, the ediff session has started, and it will
-            ;; clean up when the session ends.
-            (setq ediff-handover t)))
-      (unless ediff-handover
-        (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
-        (when (buffer-live-p source-indirect) (kill-buffer source-indirect))))))
+            (if (jirassic-org--buffer-contents-equal source-indirect pull-buffer)
+                (message "Issue %s has no new changes" issue-key)
+              (jirassic-org--pull-ediff source-indirect pull-buffer)
+              ;; At this point, the ediff session has started, and it will
+              ;; clean up when the session ends.
+              (setq ediff-handover t)))
+        (unless ediff-handover
+          (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
+          (when (buffer-live-p source-indirect) (kill-buffer source-indirect)))))))
 
 (provide 'jirassic-org)
 ;;; jirassic-org.el ends here

@@ -48,90 +48,126 @@ Org-roam template. For a full list of available variables, see the
                       (when (string-match url-pattern key-or-url)
                         (match-string 1 key-or-url)))
                     key-or-url))
-           (issue (aio-await (jirassic-get-issue key))))
+           (issue (aio-await (jirassic-get-issue key)))
+           (templates (or templates jirassic-org-roam-capture-templates))
+           ;; Resolve the template key up-front so we can record it on
+           ;; the captured node for later use by `jirassic-org-roam-pull'.
+           (template-key
+            (or keys
+                (car (let ((org-capture-templates templates))
+                       (org-capture-select-template)))))
+           (extra-drawer-props
+            `((ROAM_ALIASES ,key)
+              ,@(when jirassic-org-store-template-key
+                  `(("issue-template-key" ,template-key))))))
       (org-roam-capture-
        :goto goto
-       :keys keys
+       :keys template-key
        :node (or node (org-roam-node-create))
        :info (seq-concatenate 'list
                               (jirassic-org--issue-properties issue
-                                                              `((ROAM_ALIASES ,key)))
+                                                              extra-drawer-props)
                               info)
        :props props
-       :templates (or templates
-                      jirassic-org-roam-capture-templates)))))
+       :templates templates))))
 
 ;;;###autoload
 (defun jirassic-org-roam-pull ()
   "Pull the latest Jira issue for the Org-roam node at point and ediff it locally.
 
-The issue is identified by the `issue-key' property of the node at point.
-The remote issue is rendered using the head of the selected template from
-`jirassic-org-roam-capture-templates' (with the node and issue properties
-bound for `${var}' substitution), and the result is compared against the
-node's file using `ediff'."
+The issue is identified by the `issue-key' property of the node at
+point. The remote issue is rendered using the selected template from
+`jirassic-org-roam-capture-templates' (referenced by the
+`issue-template-key' property, with a fallback prompt) and compared
+against the node's content using `ediff'.
+
+Only `entry' and `plain' capture template types are supported, and the
+template body must be a literal string."
   (interactive)
-  (let* ((source-buffer (current-buffer))
-         (node (or (org-roam-node-at-point)
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Not in an org-mode buffer"))
+  (let* ((node (or (org-roam-node-at-point)
                    (user-error "Must be used in an org-roam node")))
          (issue-key (or (org-entry-get nil "issue-key")
                         (user-error "No issue-key property on this entry")))
-         (template-entry (let ((org-capture-templates jirassic-org-roam-capture-templates))
-                           (condition-case nil
-                               ;; Try to use the stored template key in
-                               ;; the org property drawer.
-                               (org-capture-select-template (org-entry-get nil "template-key"))
-                             ;; If that doesn't match any template
-                             ;; anymore, prompt the user to select one
-                             ;; normally.
-                             (error (org-capture-select-template)))))
+         (org-capture-templates jirassic-org-roam-capture-templates)
+         (template-entry (condition-case nil
+                             ;; Try to use the stored template key in
+                             ;; the org property drawer.
+                             (org-capture-select-template
+                              (org-entry-get nil "issue-template-key"))
+                           ;; If that doesn't match any template
+                           ;; anymore, prompt the user to select one
+                           ;; normally.
+                           (error (org-capture-select-template))))
+         (template-key (car template-entry))
          (entry-type (nth 2 template-entry))
-         ;; These entry vars are only relevant when the entry type is 'entry or
-         (source-entry-level (org-current-level))
-         (source-entry-start (ignore-errors
-                               (save-excursion (org-back-to-heading t) (point))))
-         (target (plist-get (nthcdr 4 template-entry) :target))
-         (target-type (car-safe target)) ; e.g. file+head, node, file+datetree
-         (head (and (string-match-p "head" (symbol-name target-type))
-                    (nth 2 target)))
          (template (nth 3 template-entry))
-         (issue (aio-wait-for (jirassic-get-issue issue-key)))
-         (source-indirect (make-indirect-buffer source-buffer
-                                                (format "*%s-current*" issue-key)
-                                                t))
-         (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
-         ;; Track whether setup and handover to ediff was successful.
-         (ediff-handover nil))
-    (unwind-protect
-        (progn
-          (with-current-buffer pull-buffer
-            (org-mode)
-            (let ((org-roam-capture--node node)
-                  (org-roam-capture--info
-                   (jirassic-org--issue-properties
-                    issue
-                    `((ROAM_ALIASES ,issue-key)
-                      (ID ,(org-roam-node-id node))))))
-              ;; Unless capturing to an entry, diff the whole file,
-              ;; including the head because it is probably capturing
-              ;; at the file level.
-              (when (and (not (eq entry-type 'entry)) head)
-                (insert (org-roam-capture--fill-template head)))
-              ;; Insert but keep the point before the inserted text
-              ;; because we might need to manipulate the entry to
-              ;; match the level it's at in the source buffer.
-              (save-excursion (insert (org-roam-capture--fill-template template)))
-              (when (and (eq entry-type 'entry) (org-at-heading-p))
-                (let ((delta (- source-entry-level (org-current-level))))
-                  (cond ((> delta 0) (dotimes (_ delta) (org-demote-subtree)))
-                        ((< delta 0) (dotimes (_ (- delta)) (org-promote-subtree)))))))
-            (set-buffer-modified-p nil))
-          (jirassic-org--pull-ediff source-indirect pull-buffer)
-          (setq ediff-handover t))
+         (target (plist-get (nthcdr 4 template-entry) :target))
+         (target-type (car-safe target))
+         (head (and (memq target-type '(file+head file+head+olp))
+                    (nth 2 target))))
+    (unless (memq entry-type '(entry plain))
+      (user-error
+       "Unsupported capture template type `%s'; `jirassic-org-roam-pull' only supports `entry' and `plain'"
+       entry-type))
+    (unless (stringp template)
+      (user-error
+       "Unsupported capture template body; `jirassic-org-roam-pull' requires a literal string template"))
+    (when (and (eq entry-type 'entry)
+               (not (org-current-level)))
+      (user-error "Point must be on or under a heading for `entry' templates"))
+    (let* ((source-buffer (current-buffer))
+           (source-entry-level (when (eq entry-type 'entry)
+                                 (org-current-level)))
+           (source-entry-start (when (eq entry-type 'entry)
+                                 (save-excursion
+                                   (org-back-to-heading t) (point))))
+           (extra-drawer-props
+            `((ROAM_ALIASES ,issue-key)
+              (ID ,(org-roam-node-id node))
+              ,@(when jirassic-org-store-template-key
+                  `(("issue-template-key" ,template-key)))))
+           (issue (aio-wait-for (jirassic-get-issue issue-key)))
+           (source-indirect (make-indirect-buffer source-buffer
+                                                  (format "*%s-current*" issue-key)
+                                                  t))
+           (pull-buffer (generate-new-buffer (format "*%s-latest*" issue-key)))
+           ;; Track whether setup and handover to ediff was successful.
+           (ediff-handover nil))
+      (unwind-protect
+          (progn
+            (with-current-buffer pull-buffer
+              (org-mode)
+              (let ((org-roam-capture--node node)
+                    (org-roam-capture--info
+                     (jirassic-org--issue-properties issue extra-drawer-props)))
+                ;; Unless capturing to an entry, diff the whole file,
+                ;; including the head because it is probably capturing
+                ;; at the file level.
+                (when (and (not (eq entry-type 'entry)) head)
+                  (insert (org-roam-capture--fill-template head)))
+                ;; Insert but keep the point before the inserted text
+                ;; because we might need to manipulate the entry to
+                ;; match the level it's at in the source buffer.
+                (save-excursion (insert (org-roam-capture--fill-template template)))
+                (when (and (eq entry-type 'entry) (org-at-heading-p))
+                  (let ((delta (- source-entry-level (org-current-level))))
+                    (cond ((> delta 0) (dotimes (_ delta) (org-demote-subtree)))
+                          ((< delta 0) (dotimes (_ (- delta)) (org-promote-subtree)))))))
+              (set-buffer-modified-p nil))
 
-      (unless ediff-handover
-        (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
-        (when (buffer-live-p source-indirect) (kill-buffer source-indirect))))))
+            (when (eq entry-type 'entry)
+              (with-current-buffer source-indirect
+                (goto-char source-entry-start)
+                (org-narrow-to-subtree)))
+
+            (jirassic-org--pull-ediff source-indirect pull-buffer)
+            (setq ediff-handover t))
+
+        (unless ediff-handover
+          (when (buffer-live-p pull-buffer) (kill-buffer pull-buffer))
+          (when (buffer-live-p source-indirect) (kill-buffer source-indirect)))))))
 
 (provide 'jirassic-org-roam)
 ;;; jirassic-org-roam.el ends here
