@@ -149,7 +149,10 @@ EXTRA-PROPS can be an alist of extra properties to include in the drawer."
                             ("issue-creator-display-name" ,(jira-user-display-name creator))))))
     (concat ":PROPERTIES:\n"
             (mapconcat (lambda (prop)
-                         (format ":%s: %s" (car prop) (cadr prop)))
+                         (string-trim-right
+                          (format org-property-format
+                                  (format ":%s:" (car prop))
+                                  (or (cadr prop) ""))))
                        (seq-concatenate 'list issue-props creator-props extra-props)
                        "\n")
             "\n:END:")))
@@ -295,7 +298,8 @@ template body must be a literal string."
                   ;; marker in the output; it's normally stripped later
                   ;; in `org-capture--position-cursor'. We invoke the
                   ;; filler directly, so remove the marker manually.
-                  (insert (string-replace "%?" "" (org-capture-fill-template)))))
+                  (insert (org-capture-fill-template))
+                  (org-capture--position-cursor (point-min) (point-max))))
               (goto-char (point-min))
               ;; Make sure that both entries are at the same level
               (when (and (eq template-type 'entry)
