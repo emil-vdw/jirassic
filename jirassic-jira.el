@@ -34,13 +34,21 @@ Represents any user-valued field: creator, assignee, reporter, etc."
   "A Jira project."
   id key name)
 
+(cl-defstruct jira-attachment
+  "A file attached to a Jira issue.
+
+CONTENT-URL is an authenticated endpoint that returns the raw file
+bytes (after redirects). AUTHOR is a `jira-user' struct or nil."
+  id filename mime-type size content-url created author)
+
 (cl-defstruct jira-issue
   "Container for a Jira issue.
 
 DESCRIPTION is an `adf-doc' node.
 CREATOR is a `jira-user' struct.
-PROJECT is a `jira-project' struct."
-  id key url summary description status type priority creator project)
+PROJECT is a `jira-project' struct.
+ATTACHMENTS is a list of `jira-attachment' structs."
+  id key url summary description status type priority creator project attachments)
 
 ;;; Root node
 (cl-defstruct adf-doc content)

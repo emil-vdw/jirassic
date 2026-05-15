@@ -53,6 +53,31 @@ Signals `jirassic-http-error' on HTTP or network failure and
        (aio-resolve promise (lambda () (signal (car err) (cdr err))))))
     promise))
 
+(defun jirassic-download-attachment (attachment target-path)
+  "Asynchronously download ATTACHMENT to TARGET-PATH, resolving the path on success.
+
+ATTACHMENT is a `jira-attachment' struct. TARGET-PATH must be a
+non-existent file; `plz' will not overwrite it. Signals
+`jirassic-http-error' on HTTP or network failure and `jirassic-error'
+for configuration problems."
+  (let ((promise (aio-promise)))
+    (condition-case err
+        (plz 'get (jira-attachment-content-url attachment)
+          :headers (jirassic-client--headers (jirassic-client--credentials))
+          ;; `(file PATH)' writes the un-decoded response body straight
+          ;; to disk so we don't hold the whole blob in Elisp memory.
+          :as `(file ,target-path)
+          :then (lambda (path)
+                  (aio-resolve promise (lambda () path)))
+          :else (lambda (plz-err)
+                  (aio-resolve promise
+                               (lambda ()
+                                 (signal 'jirassic-http-error
+                                         (jirassic-client--http-error-data plz-err))))))
+      (error
+       (aio-resolve promise (lambda () (signal (car err) (cdr err))))))
+    promise))
+
 (defun jirassic-client--http-error-data (plz-err)
   "Extract (CODE MESSAGE) from PLZ-ERR for `jirassic-http-error' signal data."
   (let* ((response (plz-error-response plz-err))

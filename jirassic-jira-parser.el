@@ -93,7 +93,33 @@
                 (make-jira-project
                  :id .fields.project.id
                  :key .fields.project.key
-                 :name .fields.project.name)))))
+                 :name .fields.project.name))
+     :attachments (mapcar #'jirassic--parse-attachment .fields.attachment))))
+
+(defun jirassic--parse-attachment (attachment)
+  "Create a `jira-attachment' object from an ATTACHMENT alist."
+  ;; Example shape:
+  ;; ((id . "10042")
+  ;;  (filename . "screenshot.png")
+  ;;  (mimeType . "image/png")
+  ;;  (size . 84512)
+  ;;  (created . "2026-04-01T10:00:00.000+0000")
+  ;;  (content . "https://host/rest/api/3/attachment/content/10042")
+  ;;  (author (accountId . "...") (displayName . "...") (emailAddress . "...")))
+  (declare (pure t) (side-effect-free t))
+  (let-alist attachment
+    (make-jira-attachment
+     :id .id
+     :filename .filename
+     :mime-type .mimeType
+     :size .size
+     :content-url .content
+     :created .created
+     :author (when .author
+               (make-jira-user
+                :account-id .author.accountId
+                :display-name .author.displayName
+                :email .author.emailAddress)))))
 
 (defun jirassic--parse-doc (doc)
   "Parse an ADF DOC node."
