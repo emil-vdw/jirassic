@@ -332,6 +332,41 @@ When a panel has no panel type, fall back to the generic name PANEL."
               "")
             (jirassic-serializer--serialize-content-list (adf-expand-content expand)))))
 
+;;; `adf-media'
+(cl-defmethod jirassic--serialize-to-org ((media adf-media) &optional _level)
+  "Serialize MEDIA as an `org-attach' link.
+
+For `file' type media, returns `[[attachment:ALT]]' using the media's
+alt text as the filename. When alt is missing, falls back to the media
+ID and warns: the link will not resolve without a follow-up rename.
+
+`link' type media is dropped because it has no attachment-side
+counterpart."
+  (let ((media-type (adf-media-media-type media))
+        (alt (adf-media-alt media)))
+    (cond
+     ((eq media-type 'file)
+      (if (and alt (not (string-empty-p alt)))
+          (format "[[attachment:%s]]" alt)
+        (lwarn 'jirassic :warning
+               "Media node %s has no `alt' attribute; cannot resolve attachment filename"
+               (adf-media-id media))
+        (format "[[attachment:%s]]" (adf-media-id media))))
+     (t (lwarn 'jirassic :warning "Unsupported ADF media type %s" media-type)
+        ""))))
+
+;;; `adf-media-single'
+(cl-defmethod jirassic--serialize-to-org ((node adf-media-single) &optional _level)
+  "Serialize NODE's single contained media to an `org-attach' link."
+  (jirassic-serializer--serialize-content-list (adf-media-single-content node)))
+
+;;; `adf-media-group'
+(cl-defmethod jirassic--serialize-to-org ((node adf-media-group) &optional _level)
+  "Serialize NODE's contained media as newline-separated attachment links."
+  (mapconcat #'jirassic--serialize-to-org
+             (adf-media-group-content node)
+             "\n"))
+
 ;;; `adf-table'
 (cl-defmethod jirassic--serialize-to-org ((table adf-table) &optional _level)
   "Serialize TABLE into an `org-mode' table.

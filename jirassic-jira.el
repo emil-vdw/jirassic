@@ -284,7 +284,23 @@ CONTENT must contain one or more media nodes."
 
 `adf-media' is a child of either:
 - `adf-media-group'
-- `adf-media-single'")
+- `adf-media-single'
+
+ID is the Media Services ID (a UUID), distinct from `jira-attachment'
+IDs. Per the ADF spec, the canonical way to resolve ID to filename is a
+round-trip to the Media Services API.
+
+MEDIA-TYPE is one of the symbols `file' or `link'.
+
+ALT is the alternative text, typically auto-populated to the source
+filename when the file was uploaded. It is officially optional, so it
+may be nil or an empty string.
+
+COLLECTION is the Media Services collection name.
+
+The ADF `width', `height', and `occurrenceKey' attrs are not retained:
+org-mode cannot represent them."
+  id media-type alt collection)
 
 (cl-defstruct adf-list-item
   "An item in a list.

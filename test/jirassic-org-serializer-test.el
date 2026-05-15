@@ -485,5 +485,45 @@ FIXTURE-PATH is relative to `jirassic-serializer-test--fixtures-dir'."
       (insert-file-contents path)
       (buffer-string))))
 
+;;; `adf-media'
+(ert-deftest jirassic-serializer-test-media-file-with-alt ()
+  (should (string=
+           (jirassic--serialize-to-org
+            (make-adf-media :id "id-1" :media-type 'file
+                            :alt "screenshot.png"))
+           "[[attachment:screenshot.png]]")))
+
+(ert-deftest jirassic-serializer-test-media-file-without-alt ()
+  "Falls back to the media id and warns when alt is absent."
+  (should (string=
+           (jirassic--serialize-to-org
+            (make-adf-media :id "abc-uuid" :media-type 'file))
+           "[[attachment:abc-uuid]]")))
+
+(ert-deftest jirassic-serializer-test-media-link-dropped ()
+  "Media of type `link' has no attachment counterpart."
+  (should (string=
+           (jirassic--serialize-to-org
+            (make-adf-media :id "id-1" :media-type 'link :alt "x"))
+           "")))
+
+(ert-deftest jirassic-serializer-test-media-single ()
+  (should (string=
+           (jirassic--serialize-to-org
+            (make-adf-media-single
+             :content (list (make-adf-media :id "id-1" :media-type 'file
+                                            :alt "a.png"))))
+           "[[attachment:a.png]]")))
+
+(ert-deftest jirassic-serializer-test-media-group ()
+  (should (string=
+           (jirassic--serialize-to-org
+            (make-adf-media-group
+             :content (list (make-adf-media :id "id-1" :media-type 'file
+                                            :alt "a.png")
+                            (make-adf-media :id "id-2" :media-type 'file
+                                            :alt "b.png"))))
+           "[[attachment:a.png]]\n[[attachment:b.png]]")))
+
 (provide 'jirassic-org-serializer-test)
 ;;; jirassic-org-serializer-test.el ends here

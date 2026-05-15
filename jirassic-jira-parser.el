@@ -57,6 +57,11 @@
       ;; ((type . "inlineCard") (attrs (data (@context . "https://schema.org") ...)))
       ("inlineCard" (make-adf-inline-card :url .attrs.url :data .attrs.data))
       ("table" (jirassic--parse-table node))
+      ("mediaSingle" (make-adf-media-single
+                      :content (jirassic--parse-content-list .content)))
+      ("mediaGroup" (make-adf-media-group
+                     :content (jirassic--parse-content-list .content)))
+      ("media" (jirassic--parse-media node))
       ;; ((type . "tableRow")
       ;;  (content . [((type . "tableHeader") ...) ((type . "tableCell") ...)]))
       ("tableRow" (make-adf-table-row :content (jirassic--parse-content-list .content)))
@@ -245,6 +250,26 @@ See the definition of `adf-code-block' for the constraints of
     (make-adf-panel
      :content (jirassic--parse-content-list .content)
      :panel-type .attrs.panelType)))
+
+(defun jirassic--parse-media (media)
+  "Create an `adf-media' object from a MEDIA ADF node."
+  ;; Example ADF alist:
+  ;; ((type . "media")
+  ;;  (attrs (type . "file")
+  ;;         (id . "b80d623d-f885-408b-b150-2c8843a3ac1b")
+  ;;         (alt . "screenshot.png")
+  ;;         (collection . "")
+  ;;         (width . 700)
+  ;;         (height . 400)))
+  ;;
+  ;; `attrs.alt' is optional and may be missing.
+  (declare (pure t) (side-effect-free t))
+  (let-alist media
+    (make-adf-media
+     :id .attrs.id
+     :media-type (when .attrs.type (intern .attrs.type))
+     :alt .attrs.alt
+     :collection .attrs.collection)))
 
 (defun jirassic--parse-expand (expand)
   "Create an `adf-expand' object from an EXPAND ADF node."

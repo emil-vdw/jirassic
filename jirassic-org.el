@@ -36,6 +36,8 @@ Besides the extra substitution vars, all of the standard
 Available `%:' substitutions:
 
   %:annotation            Org link to the issue (key as description).
+  %:issue-attachments     Bullet list of `[[attachment:...]]' links, one per
+                          attached file. Empty when the issue has none.
   %:issue-description     Issue body, serialized to Org.
   %:issue-id              Internal Jira ID.
   %:issue-key             Issue key, e.g. \"XYZ-123\".
@@ -189,7 +191,13 @@ level-1 heading and the description content under it. Pass 0 for
                                                                      extra-drawer-props))
          (issue-status (jira-issue-status issue))
          (creator (jira-issue-creator issue))
-         (project (jira-issue-project issue)))
+         (project (jira-issue-project issue))
+         (issue-attachments
+          (mapconcat (lambda (att)
+                       (format "- [[attachment:%s]]"
+                               (jira-attachment-filename att)))
+                     (jira-issue-attachments issue)
+                     "\n")))
     (list :type "jira"
           :link (jira-issue-url issue)
           :description (jira-issue-summary issue)
@@ -216,6 +224,7 @@ level-1 heading and the description content under it. Pass 0 for
                               (jirassic-adjust-heading-level
                                (jira-issue-description issue)
                                (or description-level-adjust 1)))
+          :issue-attachments issue-attachments
           :issue-property-drawer issue-property-drawer)))
 
 (defun jirassic-org--pull-ediff (source-buffer pull-buffer)
