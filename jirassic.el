@@ -1,10 +1,11 @@
 ;;; jirassic.el --- An Org centered Jira client -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Emil van der Westhuizen
 ;; Author: Emil van der Westhuizen <vdwemil@protonmail.com>
 ;; Maintainer: Emil van der Westhuizen <vdwemil@protonmail.com>
 ;; Created: 19 April 2025
 ;; Version: 0.1
-;; Package-Requires: ((emacs "27.1") (dash "2.0.0") (s "1.12.0") (org "9.5") (aio "1.0") (f "0.20.0") (request "0.3.0"))
+;; Package-Requires: ((emacs "28.2") (org "9.5") (aio "1.0") (plz "0.9.1") (seq "2.24"))
 ;; Homepage: https://github.com/emil-vdw/jirassic
 ;; Keywords: tools, convenience, jira
 
@@ -15,10 +16,8 @@
 ;; Provides an Org centered Jira client.
 
 ;;; Code:
-(defgroup jirassic nil
-  "Org centered Jira client."
-  :link '(url-link "https://github.com/emil-vdw/jirassic")
-  :group 'tool)
+(require 'jirassic-core)
+(require 'jirassic-org)
 
 (provide 'jirassic)
 ;;; jirassic.el ends here
